@@ -65,7 +65,7 @@ function codeInfo(c) {
 const pad2 = function (n) { return String(n).padStart(2, "0"); };
 
 async function loadWeather() {
-  const url = "https://api.open-meteo.com/v1/forecast?latitude=34.6937&longitude=135.5023&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=2&timezone=Asia%2FTokyo";
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=34.6937&longitude=135.5023&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&forecast_days=2&timezone=Asia%2FTokyo";
   try {
     const res = await fetch(url);
     const d = await res.json();
@@ -120,11 +120,7 @@ try {
   feel.font = Font.systemFont(11);
   feel.textColor = new Color("#9ca3af");
 
-  let rainMax = 0;
-  for (let h = 0; h < 24; h++) {
-    const p = d.hourly.precipitation_probability[h];
-    if (p != null && p > rainMax) rainMax = p;
-  }
+  const rainMax = d.daily.precipitation_probability_max[0] || 0;
   const sub = widget.addText(
     "最高 " + Math.round(d.daily.temperature_2m_max[0]) + "° ／ 最低 " + Math.round(d.daily.temperature_2m_min[0]) + "°" +
     " ・ 湿度 " + d.current.relative_humidity_2m + "% ・ 降水確率 " + rainMax + "%"

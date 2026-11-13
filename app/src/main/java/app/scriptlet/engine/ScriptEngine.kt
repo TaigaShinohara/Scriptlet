@@ -128,9 +128,25 @@ class ScriptEngine(private val store: ScriptStore) {
         require(url.startsWith("https://") || url.startsWith("http://")) {
             "fetch: http/https のURLだけ使えます"
         }
+        // One automatic retry on a read/connect timeout: far-away free APIs
+        // (and sleepy mobile networks) time out transiently, and a single
+        // timeout used to surface as a hard "取得に失敗: Read timed out" in
+        // widgets whose data source was actually fine.
+        var lastTimeout: java.net.SocketTimeoutException? = null
+        repeat(2) {
+            try {
+                return httpGetOnce(url)
+            } catch (e: java.net.SocketTimeoutException) {
+                lastTimeout = e
+            }
+        }
+        throw lastTimeout!!
+    }
+
+    private fun httpGetOnce(url: String): String {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
-        conn.readTimeout = 10_000
+        conn.readTimeout = 20_000
         conn.instanceFollowRedirects = true
         conn.setRequestProperty("User-Agent", "Scriptlet")
         try {
