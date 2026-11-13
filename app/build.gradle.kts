@@ -13,8 +13,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.12.0-design2"
+        versionCode = 18
+        versionName = "0.13.0-widgetfix"
     }
 
     buildTypes {

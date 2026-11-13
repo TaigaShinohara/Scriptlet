@@ -1,5 +1,6 @@
 package app.scriptlet.widget
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,7 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.text.Text
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.ScriptEngine
@@ -45,12 +47,17 @@ class ScriptletWidget : GlanceAppWidget() {
     // targeted suppression rather than a workaround.
     @android.annotation.SuppressLint("RestrictedApi")
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = (id as? AppWidgetId)?.appWidgetId ?: -1
+        val appWidgetId = (id as? AppWidgetId)?.appWidgetId
         val store = app.scriptlet.data.StoreProvider.get(context)
         val config = WidgetConfigStore(context)
         val scripts = store.scripts.value
-        val scriptId = config.scriptIdFor(appWidgetId) ?: scripts.firstOrNull()?.id
-        val script = scripts.firstOrNull { it.id == scriptId }
+        // The per-instance mapping is the ONLY source of truth for what this
+        // widget shows. There is deliberately no fallback to another script:
+        // an unconfigured instance used to render whichever script had been
+        // edited most recently, so placed widgets silently turned into
+        // different widgets than the one chosen for them.
+        val mappedId = appWidgetId?.let { config.scriptIdFor(it) }
+        val script = mappedId?.let { mid -> scripts.firstOrNull { it.id == mid } }
 
         // Last-resort guard: nothing in here may escape provideGlance, or the
         // widget would sit on its placeholder forever with no explanation.
@@ -74,7 +81,7 @@ class ScriptletWidget : GlanceAppWidget() {
             emptyMap()
         }
 
-        val options = config.optionsFor(appWidgetId)
+        val options = appWidgetId?.let { config.optionsFor(it) } ?: WidgetOptions()
         provideContent {
             var frame: GlanceModifier = GlanceModifier.fillMaxSize()
             val bgColor = options.bgHex?.let {
@@ -93,18 +100,38 @@ class ScriptletWidget : GlanceAppWidget() {
             if (options.paddingDp > 0) {
                 frame = frame.padding(options.paddingDp.dp)
             }
-            Box(
-                modifier = frame.clickable(actionRunCallback<RefreshAction>()),
-            ) {
+            // A configured widget re-runs on tap; an unconfigured one opens
+            // the app instead, so the tap always does what its text promises.
+            val tapAction = if (script != null) {
+                frame.clickable(actionRunCallback<RefreshAction>())
+            } else {
+                frame.clickable(
+                    actionStartActivity(
+                        ComponentName(context, app.scriptlet.MainActivity::class.java),
+                    ),
+                )
+            }
+            Box(modifier = tapAction) {
                 when {
-                    script == null -> Text("Scriptlet: スクリプトがありません。アプリで作成してください。")
-                    result is RunResult.Success -> GlanceTree(result.tree, images, textScale = options.textScale)
-                    result is RunResult.Error -> Text(
+                    script != null && result is RunResult.Success ->
+                        GlanceTree(result.tree, images, textScale = options.textScale)
+                    script != null && result is RunResult.Error -> Text(
                         text = "エラー: ${result.message}" +
                             (result.line?.let { "（${it}行目）" } ?: ""),
                         maxLines = 6,
                     )
-                    else -> Text("Scriptlet")
+                    script != null -> Text("Scriptlet")
+                    appWidgetId == null -> Text("Scriptlet")
+                    mappedId == null -> Text(
+                        "未設定のウィジェットです。タップでアプリを開きます。" +
+                            "直すには、このウィジェットを削除して追加し直してください。",
+                        maxLines = 6,
+                    )
+                    else -> Text(
+                        "設定されたスクリプトが見つかりません（削除されたようです）。" +
+                            "タップでアプリを開きます。",
+                        maxLines = 6,
+                    )
                 }
             }
         }

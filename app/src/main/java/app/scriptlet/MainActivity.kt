@@ -56,6 +56,7 @@ import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.ui.Tokens
 import app.scriptlet.ui.WidgetPreview
+import app.scriptlet.widget.ScriptletWidget
 import app.scriptlet.widget.ScriptletWidgetReceiver
 import app.scriptlet.widget.WidgetConfigActivity
 import kotlinx.coroutines.launch
@@ -96,6 +97,25 @@ fun requestPinWidget(context: Context, scriptId: String): Boolean {
     val provider = ComponentName(context, ScriptletWidgetReceiver::class.java)
     val extras = Bundle().apply { putString(WidgetConfigActivity.EXTRA_SCRIPT_ID, scriptId) }
     return manager.requestPinAppWidget(provider, extras, null)
+}
+
+/**
+ * Scripts changed (edited, renamed, duplicated, deleted): every placed
+ * widget re-renders from the store, so push an update now instead of
+ * leaving stale renderings on the home screen until the next periodic
+ * update (up to 30 minutes later) or a manual tap.
+ */
+@android.annotation.SuppressLint("RestrictedApi") // AppWidgetId: same targeted suppression as WidgetConfigActivity (Glance 1.1.1 has no public id type)
+fun refreshWidgetsAsync(context: Context) {
+    val appContext = context.applicationContext
+    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+        val manager = AppWidgetManager.getInstance(appContext)
+        val ids = manager.getAppWidgetIds(ComponentName(appContext, ScriptletWidgetReceiver::class.java))
+        val widget = ScriptletWidget()
+        ids.forEach { id ->
+            runCatching { widget.update(appContext, androidx.glance.appwidget.AppWidgetId(id)) }
+        }
+    }
 }
 
 @Composable
@@ -196,9 +216,9 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                             "この端末のランチャーではアプリからの追加に対応していません"
                         }
                     },
-                    onDuplicate = { store.create(item.name + " のコピー", item.code, item.desc) },
-                    onRename = { newName -> store.update(item.copy(name = newName)) },
-                    onDelete = { store.delete(item.id) },
+                    onDuplicate = { store.create(item.name + " のコピー", item.code, item.desc); refreshWidgetsAsync(context) },
+                    onRename = { newName -> store.update(item.copy(name = newName)); refreshWidgetsAsync(context) },
+                    onDelete = { store.delete(item.id); refreshWidgetsAsync(context) },
                 )
             }
             if (scripts.isEmpty()) {
@@ -396,6 +416,7 @@ private fun EditorScreen(
         }
         savedName = name
         savedCode = code
+        refreshWidgetsAsync(context)
         return savedId
     }
 
@@ -607,6 +628,7 @@ private fun EditorScreen(
                 TextButton(onClick = {
                     deleteConfirm = false
                     currentId?.let { store.delete(it) }
+                    refreshWidgetsAsync(context)
                     onBack()
                 }) { Text("削除") }
             },

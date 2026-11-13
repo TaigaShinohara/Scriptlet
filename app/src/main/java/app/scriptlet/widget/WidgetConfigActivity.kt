@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,17 +111,21 @@ class WidgetConfigActivity : ComponentActivity() {
         setContent {
             app.scriptlet.ui.ScriptletTheme {
                 val scripts by store.scripts.collectAsState()
-                var selectedId by remember { mutableStateOf(preselectId) }
-                var bgIdx by remember {
+                // rememberSaveable, not remember: with plain remember, a
+                // rotation or process recreation silently reset the picks
+                // back to the preselection, and deciding then saved a
+                // different script than the one the user had tapped.
+                var selectedId by rememberSaveable { mutableStateOf(preselectId) }
+                var bgIdx by rememberSaveable {
                     mutableIntStateOf(bgOptions.indexOfFirst { it.second == existing.bgHex }.coerceAtLeast(0))
                 }
-                var padIdx by remember {
+                var padIdx by rememberSaveable {
                     mutableIntStateOf(padOptions.indexOfFirst { it.second == existing.paddingDp }.coerceAtLeast(0))
                 }
-                var cornerIdx by remember {
+                var cornerIdx by rememberSaveable {
                     mutableIntStateOf(cornerOptions.indexOfFirst { it.second == existing.cornerDp }.coerceAtLeast(0))
                 }
-                var scaleIdx by remember {
+                var scaleIdx by rememberSaveable {
                     mutableIntStateOf(scaleOptions.indexOfFirst { it.second == existing.textScale }.coerceAtLeast(0))
                 }
 
@@ -289,9 +294,12 @@ class WidgetConfigActivity : ComponentActivity() {
                         enabled = selectedId != null,
                         onClick = {
                             val sid = selectedId ?: return@Button
-                            config.setScript(appWidgetId, sid)
-                            config.setOptions(
+                            // One synchronous commit for mapping + options:
+                            // the choice must be durable before RESULT_OK,
+                            // even if the process dies right after deciding.
+                            config.setConfig(
                                 appWidgetId,
+                                sid,
                                 WidgetOptions(
                                     bgHex = bgOptions[bgIdx].second,
                                     paddingDp = padOptions[padIdx].second,
@@ -305,7 +313,12 @@ class WidgetConfigActivity : ComponentActivity() {
                             )
                             setResult(Activity.RESULT_OK, result)
                             lifecycleScope.launch {
-                                refreshWidget(appWidgetId)
+                                try {
+                                    refreshWidget(appWidgetId)
+                                } catch (e: Exception) {
+                                    // The mapping is saved; the periodic
+                                    // update will still pick it up.
+                                }
                                 finish()
                             }
                         },

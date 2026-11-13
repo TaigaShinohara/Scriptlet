@@ -21,6 +21,23 @@ class WidgetConfigStore(context: Context) {
         prefs.edit().putString("script_$appWidgetId", scriptId).apply()
     }
 
+    /**
+     * Writes the script mapping and the frame options as ONE synchronous
+     * commit. The configure flow used two apply() calls: apply() only queues
+     * the disk write, so a process kill right after deciding could lose the
+     * mapping entirely — and the widget then had nothing to show. commit()
+     * guarantees the choice is durable before RESULT_OK is returned.
+     */
+    fun setConfig(appWidgetId: Int, scriptId: String, options: WidgetOptions) {
+        prefs.edit()
+            .putString("script_$appWidgetId", scriptId)
+            .putString("opt_bg_$appWidgetId", options.bgHex ?: "")
+            .putInt("opt_pad_$appWidgetId", options.paddingDp)
+            .putInt("opt_corner_$appWidgetId", options.cornerDp)
+            .putFloat("opt_scale_$appWidgetId", options.textScale)
+            .commit()
+    }
+
     fun optionsFor(appWidgetId: Int): WidgetOptions = WidgetOptions(
         bgHex = prefs.getString("opt_bg_$appWidgetId", null)?.takeIf { it.isNotEmpty() },
         paddingDp = prefs.getInt("opt_pad_$appWidgetId", 0),
