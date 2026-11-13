@@ -10,14 +10,19 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,11 +50,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import app.scriptlet.data.ScriptItem
 import app.scriptlet.data.ScriptStore
 import app.scriptlet.engine.RunResult
@@ -81,6 +92,58 @@ class MainActivity : ComponentActivity() {
 }
 
 /** One-line summary for pickers: stored description, else sample description by name, else the first real code line. */
+/** Splits a leading emoji cluster off a script name for the list tile: (emoji, rest). */
+fun splitLeadingEmoji(name: String): Pair<String?, String> {
+    var idx = 0
+    var found = false
+    while (idx < name.length) {
+        val cp = name.codePointAt(idx)
+        val pictographic = cp in 0x1F000..0x1FAFF || cp in 0x2600..0x27BF ||
+            cp in 0x2300..0x23FF || cp in 0x2B00..0x2BFF
+        val glue = cp == 0xFE0F || cp == 0x200D || cp == 0x20E3
+        if (pictographic) {
+            found = true
+            idx += Character.charCount(cp)
+        } else if (glue && found) {
+            idx += Character.charCount(cp)
+        } else {
+            break
+        }
+    }
+    if (!found) return null to name
+    val rest = name.substring(idx).trim()
+    return name.substring(0, idx) to rest.ifEmpty { name }
+}
+
+/**
+ * Face tile for a script: its leading emoji (or first letter) on a soft
+ * brand tint, rotated through the 4 brand roles by a stable seed hash.
+ * Shared by the list cards and the new-script chooser so a script looks
+ * like the same friendly tool in both places.
+ */
+@Composable
+fun EmojiTile(name: String, seed: String, size: Dp = 48.dp, emojiSize: Int = 24) {
+    val (emoji, _) = splitLeadingEmoji(name)
+    val tileTints = listOf(Tokens.Pink, Tokens.Orange, Tokens.Purple, Tokens.Sky)
+    val tint = tileTints[(seed.hashCode() and Int.MAX_VALUE) % tileTints.size]
+    Box(
+        modifier = Modifier.size(size)
+            .background(tint.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (emoji != null) {
+            Text(emoji, fontSize = emojiSize.sp)
+        } else {
+            Text(
+                name.take(1),
+                style = MaterialTheme.typography.titleLarge,
+                color = tint,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
 fun scriptSummary(item: ScriptItem): String =
     item.desc.ifBlank {
         SampleScripts.descForName(item.name) ?: item.code.lineSequence()
@@ -196,9 +259,46 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(padding),
+            // Generous bottom padding so the last card can scroll fully
+            // clear of the extended FAB (it used to stay half-hidden).
+            contentPadding = PaddingValues(
+                start = Tokens.ScreenPadding,
+                end = Tokens.ScreenPadding,
+                top = Tokens.ScreenPadding,
+                bottom = 96.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
+            item {
+                // Welcome band: the app's promise and the easiest first step,
+                // so a first-time viewer thinks "I could do this too".
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Tokens.CardRadius),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
+                ) {
+                    Column(modifier = Modifier.padding(Tokens.CardPadding)) {
+                        Text(
+                            "ホーム画面を、自分の道具に",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "スクリプトを選ぶと編集が始まります。まずはサンプルを「実行プレビュー」で試すのがおすすめ。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        TextButton(onClick = { showChooser = true }) {
+                            Text("サンプルから作る →", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
             pinNote?.let { note ->
                 item {
                     Text(note, color = MaterialTheme.colorScheme.primary)
@@ -233,54 +333,130 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
     }
 
     if (showChooser) {
-        AlertDialog(
+        // Wide custom dialog (the platform AlertDialog was too narrow to
+        // read descriptions comfortably). Entries are mini-cards with the
+        // same face tiles as the list, so picking feels like browsing a
+        // shelf of ready-made tools — not reading a file menu.
+        Dialog(
             onDismissRequest = { showChooser = false },
-            title = { Text("新しいスクリプト") },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    @Composable
-                    fun sampleEntry(index: Int) {
-                        val (sampleName, sampleCode) = SampleScripts.all[index]
-                        val sampleDesc = SampleScripts.descs.getOrElse(index) { "" }
-                        Column(
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        "新しいスクリプト",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "選ぶだけですぐ使えます。あとから中身も自由に変えられます。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(Tokens.ItemSpacing))
+                    Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(Tokens.SmallSpacing),
+                    ) {
+                        @Composable
+                        fun sampleEntry(index: Int) {
+                            val (sampleName, sampleCode) = SampleScripts.all[index]
+                            val sampleDesc = SampleScripts.descs.getOrElse(index) { "" }
+                            val (_, restName) = splitLeadingEmoji(sampleName)
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    showChooser = false
+                                    onNew(sampleName, sampleCode, sampleDesc)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    EmojiTile(
+                                        name = sampleName,
+                                        seed = SampleScripts.keys[index],
+                                        size = 40.dp,
+                                        emojiSize = 20,
+                                    )
+                                    Spacer(Modifier.size(Tokens.ItemSpacing))
+                                    Column {
+                                        Text(restName, style = MaterialTheme.typography.titleMedium)
+                                        if (sampleDesc.isNotEmpty()) {
+                                            Text(
+                                                sampleDesc,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            "おすすめ",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        SampleScripts.all.indices
+                            .filter { SampleScripts.keys[it] in SampleScripts.featuredKeys }
+                            .forEach { sampleEntry(it) }
+                        Spacer(Modifier.height(Tokens.SmallSpacing))
+                        Text(
+                            "そのほかのサンプル",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        SampleScripts.all.indices
+                            .filter { SampleScripts.keys[it] !in SampleScripts.featuredKeys }
+                            .forEach { sampleEntry(it) }
+                        Spacer(Modifier.height(Tokens.SmallSpacing))
+                        Card(
                             modifier = Modifier.fillMaxWidth().clickable {
                                 showChooser = false
-                                onNew(sampleName, sampleCode, sampleDesc)
-                            }.padding(vertical = Tokens.SmallSpacing),
+                                onNew("新しいスクリプト", "// ここにスクリプトを書く\nconst widget = new ListWidget();\n", "")
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            ),
                         ) {
-                            Text(sampleName, style = MaterialTheme.typography.titleSmall)
-                            if (sampleDesc.isNotEmpty()) {
-                                Text(
-                                    sampleDesc,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                EmojiTile(name = "✍️ まっさら", seed = "blank", size = 40.dp, emojiSize = 20)
+                                Spacer(Modifier.size(Tokens.ItemSpacing))
+                                Column {
+                                    Text("まっさらから書く", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "空白のスクリプト。自分でコードを書きたい人向け",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
-                    Text("おすすめ", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    SampleScripts.all.indices
-                        .filter { SampleScripts.keys[it] in SampleScripts.featuredKeys }
-                        .forEach { sampleEntry(it) }
-                    Spacer(Modifier.height(8.dp))
-                    Text("基本サンプル", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    SampleScripts.all.indices
-                        .filter { SampleScripts.keys[it] !in SampleScripts.featuredKeys }
-                        .forEach { sampleEntry(it) }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = {
-                        showChooser = false
-                        onNew("新しいスクリプト", "// ここにスクリプトを書く\nconst widget = new ListWidget();\n", "")
-                    }) { Text("空白のスクリプト（まっさらから書く）") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { showChooser = false }) { Text("キャンセル") }
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showChooser = false }) { Text("キャンセル") }
-            },
-        )
+            }
+        }
     }
 }
 
@@ -304,11 +480,16 @@ private fun ScriptCard(
         shape = RoundedCornerShape(Tokens.CardRadius),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
-                Text(item.name, style = MaterialTheme.typography.titleMedium)
+            // Face tile (shared part): the list reads as a shelf of friendly
+            // tools, not grey file rows.
+            val (_, restName) = splitLeadingEmoji(item.name)
+            EmojiTile(name = item.name, seed = item.id)
+            Spacer(Modifier.size(Tokens.ItemSpacing))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(restName, style = MaterialTheme.typography.titleMedium)
                 val summary = scriptSummary(item)
                 if (summary.isNotEmpty()) {
                     Spacer(Modifier.height(2.dp))
@@ -316,6 +497,7 @@ private fun ScriptCard(
                         summary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
                     )
                 }
                 Spacer(Modifier.height(2.dp))
