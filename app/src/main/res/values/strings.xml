@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Scriptlet</string>
+    <string name="widget_description">JavaScriptスクリプトの内容を表示するウィジェット</string>
+    <string name="preview_subtitle">JSウィジェット</string>
+    <string name="preview_line_tasks">タスクや予定を表示</string>
+    <string name="preview_line_charts">グラフや達成率も</string>
+    <string name="preview_line_freedom">JavaScriptで自由に作れます</string>
+</resources>

@@ -1,0 +1,23 @@
+# Build output and machine state
+.gradle/
+.kotlin/
+app/build/
+build/
+local.properties
+*.apk
+
+# Logs from local build runs
+*.log
+
+# VM-local build helper (see settings.gradle.kts note)
+/build.sh
+
+# Early engine experiments (not part of the app)
+/spike/
+
+# Ops tooling and generated data for the author's SNS board widget.
+# The feed snapshots contain task titles, so they stay out of the repo.
+/tools/
+/assets/
+/sns-feed.json
+/.sns-getboard-latest.json
