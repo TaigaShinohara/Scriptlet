@@ -92,7 +92,7 @@ private val worries = listOf(
     Worry(
         label = "今週の予定を、パッと見たい",
         mirror = "「今週の予定を、パッと見たい」",
-        strength = "週間カレンダーの完成品サンプルがあるから、置くだけで今週が見えます。",
+        strength = "月間カレンダーの完成品サンプルがあるから、置くだけで今月が一覧できます。",
         trioOrder = listOf(1, 0, 2),
         trialKey = "weekly-calendar",
         buildKey = "weekly-calendar",
@@ -128,7 +128,7 @@ private data class BuildChoice(val label: String, val sampleKey: String?)
 
 private val buildChoices = listOf(
     BuildChoice("🌤 天気ウィジェット", "showcase-weather"),
-    BuildChoice("🗓 週間カレンダー", "weekly-calendar"),
+    BuildChoice("🗓 月間カレンダー", "weekly-calendar"),
     BuildChoice("⏳ カウントダウン", "showcase-countdown"),
     BuildChoice("✍️ まっさらから書く", null),
 )

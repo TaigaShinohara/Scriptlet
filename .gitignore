@@ -21,3 +21,6 @@ local.properties
 /assets/
 /sns-feed.json
 /.sns-getboard-latest.json
+
+# Preset authoring/validation scratch (canonical source is SampleScripts.kt)
+/preset-work/
