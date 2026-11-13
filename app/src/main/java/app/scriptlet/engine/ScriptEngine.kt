@@ -6,7 +6,12 @@ import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.QuickJsException
 import com.dokar.quickjs.binding.asyncFunction
 import com.dokar.quickjs.binding.function
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,25 +45,70 @@ internal fun InputStream.readCapped(maxBytes: Int): ByteArray {
 @OptIn(ExperimentalQuickJsApi::class)
 class ScriptEngine(private val store: ScriptStore) {
 
-    // Runs are serialized and confined to one dedicated thread. QuickJS is a
-    // native runtime: creating instances back-to-back on a shared thread pool
-    // let a second run stall without ever returning (the preview button then
-    // stayed dead). One thread + one run at a time removes that class of
-    // failure for the editor, the onboarding trial and widget updates alike.
-    private val runMutex = Mutex()
-    private val runDispatcher = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "scriptlet-js").apply { isDaemon = true }
-    }.asCoroutineDispatcher()
-
-    suspend fun run(scriptId: String, code: String): RunResult = runMutex.withLock {
-        runInternal(scriptId, code)
+    // Runs are serialized per "slot" (one mutex + one dedicated thread).
+    // QuickJS is a native runtime, and a run can stall inside a native call
+    // without ever returning. Because coroutine timeouts are cooperative,
+    // such a stall also trapped the caller's withTimeoutOrNull — it waits
+    // for the stalled child to unwind — so the preview button stayed dead
+    // forever (reported on the editor in v0.10.1 and again on the
+    // onboarding trial in v0.15.0, despite the single-thread serialization).
+    // Layered defences:
+    //  1. runDetached(): UI callers await a Deferred owned by the engine,
+    //     so their timeout fires on time instead of awaiting the stall.
+    //  2. A watchdog: a run still in flight after WEDGE_MS poisons its
+    //     slot; the slot is swapped for a fresh one so the NEXT run starts
+    //     clean instead of queueing behind the stalled run forever. The
+    //     stalled run keeps its daemon thread and is simply abandoned.
+    private class Slot {
+        val mutex = Mutex()
+        val dispatcher = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "scriptlet-js").apply { isDaemon = true }
+        }.asCoroutineDispatcher()
     }
 
-    private suspend fun runInternal(scriptId: String, code: String): RunResult = withContext(runDispatcher) {
+    @Volatile private var slot = Slot()
+    private val watchdog = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "scriptlet-watchdog").apply { isDaemon = true }
+    }
+    private val detachedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    suspend fun run(scriptId: String, code: String): RunResult {
+        val mySlot = slot
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        val guard = watchdog.schedule(
+            { if (!finished.get()) recycle(mySlot) },
+            WEDGE_MS, java.util.concurrent.TimeUnit.MILLISECONDS,
+        )
+        return try {
+            mySlot.mutex.withLock { runInternal(scriptId, code, mySlot.dispatcher) }
+        } finally {
+            finished.set(true)
+            guard.cancel(false)
+        }
+    }
+
+    private fun recycle(poisoned: Slot) {
+        synchronized(this) {
+            if (slot === poisoned) {
+                slot = Slot()
+                try { poisoned.dispatcher.close() } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /**
+     * Runs the script on the engine's own scope. Awaiting the returned
+     * Deferred can be timed out promptly (it is not the caller's child job),
+     * even when the run itself is stalled in native code.
+     */
+    fun runDetached(scriptId: String, code: String): Deferred<RunResult> =
+        detachedScope.async { run(scriptId, code) }
+
+    private suspend fun runInternal(scriptId: String, code: String, dispatcher: CoroutineDispatcher): RunResult = withContext(dispatcher) {
         // JS callbacks can arrive from QuickJS job threads; keep the log list thread-safe.
         val logs = Collections.synchronizedList(mutableListOf<String>())
         val qjs = try {
-            QuickJs.create(runDispatcher)
+            QuickJs.create(dispatcher)
         } catch (e: Exception) {
             return@withContext RunResult.Error("JSエンジンの初期化に失敗: ${e.message}", null, logs.toList())
         }
@@ -167,5 +217,8 @@ class ScriptEngine(private val store: ScriptStore) {
     private companion object {
         const val MAX_FETCH_BYTES = 512 * 1024
         const val MAX_TREE_JSON_CHARS = 1_000_000
+
+        /** A run in flight longer than this is treated as wedged; its slot is recycled for the next run. */
+        const val WEDGE_MS = 30_000L
     }
 }

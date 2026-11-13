@@ -192,18 +192,31 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
     var onboardingDone by remember { mutableStateOf(prefs.getInt("onboarding_version", 0) >= 3) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var createSeed by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+    var showHelp by remember { mutableStateOf(false) }
+    // Manual replay from the help screen: same onboarding, but leaving it
+    // returns to the list and the recorded version is left untouched.
+    var replayOnboarding by remember { mutableStateOf(false) }
 
     when {
-        !onboardingDone -> app.scriptlet.ui.OnboardingScreen(
+        !onboardingDone || replayOnboarding -> app.scriptlet.ui.OnboardingScreen(
             engine = engine,
             onFinish = { name, code, desc ->
                 prefs.edit().putInt("onboarding_version", 3).apply()
                 onboardingDone = true
+                replayOnboarding = false
                 createSeed = Triple(name, code, desc)
             },
             onSkip = {
                 prefs.edit().putInt("onboarding_version", 3).apply()
                 onboardingDone = true
+                replayOnboarding = false
+            },
+        )
+        showHelp -> HelpScreen(
+            onBack = { showHelp = false },
+            onReplayOnboarding = {
+                showHelp = false
+                replayOnboarding = true
             },
         )
         createSeed != null -> EditorScreen(
@@ -235,13 +248,14 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
             store = store,
             onOpen = { editingId = it },
             onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
+            onHelp = { showHelp = true },
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit) {
+private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
     val context = LocalContext.current
     val scripts by store.scripts.collectAsState()
     val fmt = remember { SimpleDateFormat("MM/dd HH:mm", Locale.JAPAN) }
@@ -249,7 +263,21 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
     var pinNote by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Scriptlet") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Scriptlet") },
+                actions = {
+                    IconButton(onClick = onHelp) {
+                        Text(
+                            "？",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             androidx.compose.material3.ExtendedFloatingActionButton(
                 onClick = { showChooser = true },
@@ -456,6 +484,105 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Help: how the app works, a mini writing guide, troubleshooting, and the
+ * door back into the onboarding. Static content only — nothing here runs
+ * or saves anything; the one filled button is the onboarding replay.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
+    val context = LocalContext.current
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("使い方") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("← 一覧") } },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(Tokens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
+        ) {
+            @Composable
+            fun sectionTitle(text: String) {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            @Composable
+            fun body(text: String) {
+                Text(text, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            sectionTitle("基本の流れ（3ステップ）")
+            body("1. 「＋ 新規」からサンプルを選ぶ（おすすめが近道）\n2. 編集画面で「▶ 実行プレビュー」を押して見え方を確かめる\n3. 「ホーム画面に追加」→ 設定画面で内容を決めて「この内容で決定」")
+
+            sectionTitle("ウィジェットが更新されるタイミング")
+            body("自動更新は最短30分ごと（Androidの仕組み）。ウィジェットをタップしてもその場で更新されます。時計などに表示される時刻は「更新された時点」のものです。")
+
+            sectionTitle("スクリプトの書き方")
+            body("いちばん小さな形はこれです。")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Tokens.CardRadius),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {
+                Text(
+                    "const widget = new ListWidget();\n" +
+                        "const t = widget.addText(\"こんにちは\");\n" +
+                        "t.font = Font.boldSystemFont(18);\n" +
+                        "Script.setWidget(widget);",
+                    modifier = Modifier.padding(Tokens.CardPadding),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
+            }
+            body(
+                "使える部品: addText（文字）／ addStack（横並び・縦並び）／ addSpacer（余白）／ addDivider（区切り線）／ addImage（画像）／ addProgress（バー）／ addCanvas（自由な描画）／ addLink（リンク）\n" +
+                    "色は new Color(\"#c2185b\")、文字の大きさは Font.systemFont(14) / Font.boldSystemFont(14) です。\n" +
+                    "データ取得は await fetch(\"https://…\") でJSONが取れます。保存は Storage.get(キー) / Storage.set(キー, 値) で、スクリプトごとに残ります。\n" +
+                    "サンプルのコードを読むのが一番の近道です。気になるサンプルを開いて、数字や文字を1つ変えて実行してみてください。"
+            )
+
+            sectionTitle("うまくいかないとき")
+            body(
+                "・エラーは行番号つきで表示されます。その行を見直してみてください。\n" +
+                    "・fetch は https のURLだけ使えます。通信が不安定なときは、もう一度実行すると通ることがあります。\n" +
+                    "・実行が長く終わらないときは、20秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。\n" +
+                    "・ウィジェットが「未設定」と出るときは、そのウィジェットを削除して、アプリから追加し直してください。"
+            )
+
+            sectionTitle("最初から体験し直す")
+            body("初回に出てきた案内（オンボーディング）を、もう一度見ることができます。")
+            Button(
+                onClick = onReplayOnboarding,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("オンボーディングをもう一度見る") }
+
+            Text(
+                "Scriptlet" + if (versionName.isNotEmpty()) " v$versionName" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -704,7 +831,11 @@ private fun EditorScreen(
                         scope.launch {
                             try {
                                 result = kotlinx.coroutines.withTimeoutOrNull(20_000) {
-                                    engine.run(id, code)
+                                    // Detached (engine-owned job): a plain
+                                    // child call would trap this timeout if
+                                    // the run stalls in native code, and the
+                                    // button would never recover.
+                                    engine.runDetached(id, code).await()
                                 } ?: RunResult.Error(
                                     "実行が20秒以内に終わりませんでした。通信や処理が詰まっている可能性があります。もう一度押してください。",
                                     null, emptyList(),

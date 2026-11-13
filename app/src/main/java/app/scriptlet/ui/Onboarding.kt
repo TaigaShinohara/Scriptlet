@@ -722,7 +722,10 @@ private fun TrialPage(
                                 val r = try {
                                     kotlinx.coroutines.withTimeoutOrNull(20_000) {
                                         val (_, code) = SampleScripts.all[sampleIdx]
-                                        engine.run("onboarding-trial", code)
+                                        // Detached: awaiting a child of this
+                                        // scope would trap the timeout itself
+                                        // if the run stalls in native code.
+                                        engine.runDetached("onboarding-trial", code).await()
                                     } ?: RunResult.Error(
                                         "実行が20秒以内に終わりませんでした。もう一度試してください。",
                                         null, emptyList(),
