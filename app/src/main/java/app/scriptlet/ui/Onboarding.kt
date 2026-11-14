@@ -71,12 +71,11 @@ private val BrandOrange = Tokens.Orange
 private val BrandPurple = Tokens.Purple
 private val BrandSky = Tokens.Sky
 
-private const val PAGE_COUNT = 13
+private const val PAGE_COUNT = 12
 private const val PAGE_WORRY = 1
 private const val PAGE_MATCH = 2
 private const val PAGE_TRIAL = 5
 private const val PAGE_TRIAL_RESULT = 6
-private const val PAGE_BUILD = 10
 
 /** The worry/wish picked on the question page; drives the match page, the value order, the trial sample and the preselected build choice. */
 private data class Worry(
@@ -121,16 +120,6 @@ private val worries = listOf(
         trialKey = "daily-art",
         buildKey = null,
     ),
-)
-
-/** A first-run build choice: which sample the editor opens with after onboarding. */
-private data class BuildChoice(val label: String, val sampleKey: String?)
-
-private val buildChoices = listOf(
-    BuildChoice("🌤 天気ウィジェット", "showcase-weather"),
-    BuildChoice("🗓 月間カレンダー", "weekly-calendar"),
-    BuildChoice("⏳ カウントダウン", "showcase-countdown"),
-    BuildChoice("✍️ まっさらから書く", null),
 )
 
 /** Praise lines for the medium/large tiers: 3+ patterns each, never the same twice in a row, one sentence, specific. */
@@ -323,7 +312,6 @@ fun OnboardingScreen(
     val reducedMotion = rememberReducedMotion()
     val praise = remember { PraiseBook() }
     var worry by remember { mutableStateOf<Worry?>(null) }
-    var build by remember { mutableStateOf<BuildChoice?>(null) }
     var trialResult by remember { mutableStateOf<RunResult?>(null) }
     var trialPraiseLine by remember { mutableStateOf<String?>(null) }
     // Set once the user leaves via skip/list: a celebration that is still
@@ -357,7 +345,10 @@ fun OnboardingScreen(
 
     fun finish() {
         if (exited) return
-        val key = build?.sampleKey
+        // No second question page (removed at the user's direction,
+        // 2026-11-14 — "I want to use the app already"): the first question's
+        // answer already carries the recommended first sample.
+        val key = worry?.buildKey
         val idx = if (key != null) SampleScripts.keys.indexOf(key) else -1
         if (idx >= 0) {
             val (name, code) = SampleScripts.all[idx]
@@ -451,23 +442,17 @@ fun OnboardingScreen(
                         reducedMotion = reducedMotion, active = active,
                         hero = { HomeMock(variant = 1, reducedMotion = reducedMotion) },
                     )
-                    PAGE_BUILD -> BuildPage(
-                        worry = worry, haptics = haptics, reducedMotion = reducedMotion,
-                        onChoose = { c ->
-                            build = c
-                            scope.launch {
-                                delay(320)
-                                goToVerified(PAGE_BUILD, 11)
-                            }
-                        },
-                    )
-                    11 -> PageShell(
+                    10 -> PageShell(
                         headline = "毎日見る画面が、変わる",
                         sub = "時計も天気も予定も、全部が自分の手作りになります。",
                         reducedMotion = reducedMotion, active = active,
                         hero = { HomeMock(variant = 2, reducedMotion = reducedMotion) },
                     )
-                    else -> FinishPage(build, praise, haptics, reducedMotion, onStart = { finish() }, onList = { leaveToList() })
+                    else -> {
+                        val idx = worry?.buildKey?.let { SampleScripts.keys.indexOf(it) } ?: -1
+                        val sampleName = if (idx >= 0) SampleScripts.all[idx].first else null
+                        FinishPage(sampleName, praise, haptics, reducedMotion, onStart = { finish() }, onList = { leaveToList() })
+                    }
                 }
             }
             // Window dots: at most 5 visible, sliding with the page, edges
@@ -500,7 +485,7 @@ fun OnboardingScreen(
             }
             // Question pages and the trial page have no Next button: the
             // choice / the run itself is the way forward.
-            val noNext = pagerState.currentPage in listOf(PAGE_WORRY, PAGE_TRIAL, PAGE_BUILD)
+            val noNext = pagerState.currentPage in listOf(PAGE_WORRY, PAGE_TRIAL)
             if (pagerState.currentPage < PAGE_COUNT - 1 && !noNext) {
                 Button(
                     onClick = {
@@ -807,75 +792,10 @@ private fun TrialResultPage(result: RunResult?, praiseLine: String?) {
     }
 }
 
-/** Question page 2 (build choice): no Next button and no result text here; choosing reacts small and auto-advances. */
-@Composable
-private fun BuildPage(
-    worry: Worry?,
-    haptics: (Int) -> Unit,
-    reducedMotion: Boolean,
-    onChoose: (BuildChoice) -> Unit,
-) {
-    var selected by remember { mutableStateOf<BuildChoice?>(null) }
-    var bounce by remember { mutableIntStateOf(0) }
-    // Preselect from the worry answer (a starting state, not a decision):
-    // the page still advances only when the user presses a choice.
-    LaunchedEffect(worry) {
-        if (selected == null && worry?.buildKey != null) {
-            selected = buildChoices.firstOrNull { it.sampleKey == worry.buildKey }
-        }
-    }
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(24.dp))
-        Text(
-            "最初に作りたいのは？",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "選んだサンプルで、最後にそのまま作り始められます。",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(20.dp))
-        buildChoices.forEach { c ->
-            val isSelected = selected == c
-            PraiseMotion(trigger = if (isSelected) bounce else 0, reducedMotion = reducedMotion) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
-                        .clickable {
-                            selected = c
-                            bounce++
-                            haptics(1)
-                            onChoose(c)
-                        },
-                    border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, BrandPink) else null,
-                    colors = if (isSelected) {
-                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    } else {
-                        CardDefaults.cardColors()
-                    },
-                ) {
-                    Text(
-                        (if (isSelected) "✓ " else "") + c.label,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
 /** Connection page: the large-tier celebration fires once, then the editor opens. */
 @Composable
 private fun FinishPage(
-    build: BuildChoice?,
+    sampleName: String?,
     praise: PraiseBook,
     haptics: (Int) -> Unit,
     reducedMotion: Boolean,
@@ -904,10 +824,10 @@ private fun FinishPage(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            if (build != null) {
-                "「${build.label}」の編集画面が開きます。▶ 実行プレビューですぐ見られます。"
+            if (sampleName != null) {
+                "「$sampleName」の編集画面が開きます。▶ 実行プレビューですぐ見られます。"
             } else {
-                "サンプルの編集画面が開きます。▶ 実行プレビューですぐ見られます。"
+                "まっさらな編集画面が開きます。▶ 実行プレビューですぐ見られます。"
             },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
