@@ -102,7 +102,7 @@ private val worries = listOf(
         mirror = "「天気や数字を、すぐチェックしたい」",
         strength = "天気も進捗も、本物のデータを取って表示するサンプルが揃っています。",
         trioOrder = listOf(0, 2, 1),
-        trialKey = "progress-demo",
+        trialKey = "analog-clock",
         buildKey = "showcase-weather",
     ),
     Worry(
@@ -118,7 +118,7 @@ private val worries = listOf(
         mirror = "",
         strength = "決めなくて大丈夫。本物のサンプルが動くところから、見てみましょう。",
         trioOrder = listOf(0, 1, 2),
-        trialKey = "hello",
+        trialKey = "daily-art",
         buildKey = null,
     ),
 )
@@ -433,7 +433,7 @@ fun OnboardingScreen(
                     7 -> PageShell(
                         stepLabel = "ステップ 1 / 3",
                         headline = "サンプルから選ぶ",
-                        sub = "完成品のサンプルが9本。まずは選ぶだけで大丈夫。",
+                        sub = "完成品のサンプルが14本。まずは選ぶだけで大丈夫。",
                         reducedMotion = reducedMotion, active = active,
                         hero = { SampleListMock(reducedMotion) },
                     )
@@ -695,7 +695,7 @@ private fun TrialPage(
     var running by remember { mutableStateOf(false) }
     var bounce by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
-    val sampleIdx = SampleScripts.keys.indexOf(worry?.trialKey ?: "hello").coerceAtLeast(0)
+    val sampleIdx = SampleScripts.keys.indexOf(worry?.trialKey ?: "daily-art").coerceAtLeast(0)
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1044,33 +1044,63 @@ private fun TrioMock(order: List<Int>) {
     }
 }
 
+/** A bar that stands in for a line of text in a schematic mock — no legible words, so a teaching page never reads as the real, tappable thing. */
+@Composable
+private fun SkeletonBar(widthDp: Int, heightDp: Int = 10, color: Color) {
+    Box(
+        modifier = Modifier.width(widthDp.dp).height(heightDp.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(color),
+    )
+}
+
 @Composable
 private fun SampleListMock(reducedMotion: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        listOf(
-            "🌤 大阪の天気（実データ）" to "天気と気温グラフ",
-            "⏳ 年末カウントダウン" to "残り日数を円ゲージで",
-            "🗓 週間ダッシュボード" to "予定とタスクのまとめ",
-        ).forEachIndexed { i, (name, desc) ->
-            // Hero motion: the recommended first card's frame gently pulses.
-            if (i == 0) {
-                PulseAlpha(reducedMotion) { a ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        border = androidx.compose.foundation.BorderStroke(2.dp, BrandPink.copy(alpha = a)),
+    // Schematic only (user direction, 2026-11-14): skeleton bars instead of
+    // legible sample names, no pulse inviting a tap, and an explicit
+    // "illustration" label. This page teaches the steps; the real list is
+    // one swipe past the end of the onboarding. (The old mock also carried
+    // stale sample names that no longer exist.)
+    val barColor = MaterialTheme.colorScheme.onSurface
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "イラスト（手順の説明）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.End),
+        )
+        Spacer(Modifier.height(6.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val tints = listOf(BrandPink, BrandOrange, BrandSky)
+            listOf(150, 128, 142).forEachIndexed { i, titleWidth ->
+                val row: @Composable () -> Unit = {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(name, style = MaterialTheme.typography.titleSmall)
-                            Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Box(
+                            modifier = Modifier.size(34.dp).clip(CircleShape)
+                                .background(tints[i].copy(alpha = 0.25f)),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SkeletonBar(titleWidth, color = barColor.copy(alpha = 0.30f))
+                            SkeletonBar(titleWidth * 62 / 100, heightDp = 8, color = barColor.copy(alpha = 0.16f))
                         }
                     }
                 }
-            } else {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(name, style = MaterialTheme.typography.titleSmall)
-                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                if (i == 0) {
+                    // The chosen one: a still pink frame and tint — selected,
+                    // but quiet. Nothing on a teaching page should pulse.
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, BrandPink),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        ),
+                    ) { row() }
+                } else {
+                    Card(modifier = Modifier.fillMaxWidth()) { row() }
                 }
             }
         }
@@ -1079,15 +1109,35 @@ private fun SampleListMock(reducedMotion: Boolean) {
 
 @Composable
 private fun PreviewMock(reducedMotion: Boolean) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        MiniWidgetCard("Hello, Scriptlet!", "いま 9:41", BrandPink, Modifier.fillMaxWidth())
-        Spacer(Modifier.height(14.dp))
-        // Hero motion: the run button pulses — "press me" without a word.
-        PulseAlpha(reducedMotion) { a ->
+    // Schematic only, same rule as the sample-list mock: the old version had
+    // a labeled, pulsing fake "▶ 実行プレビュー" button — on a page that
+    // only teaches the step, it read as the real button and invited taps.
+    val barColor = MaterialTheme.colorScheme.onSurface
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "イラスト（手順の説明）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.End),
+        )
+        Spacer(Modifier.height(6.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SkeletonBar(118, color = BrandPink.copy(alpha = 0.55f))
+                    SkeletonBar(186, heightDp = 9, color = barColor.copy(alpha = 0.18f))
+                    SkeletonBar(96, heightDp = 9, color = barColor.copy(alpha = 0.18f))
+                }
+            }
+            Spacer(Modifier.height(14.dp))
             Box(
-                modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(BrandPink.copy(alpha = 0.55f + 0.45f * a)).padding(horizontal = 22.dp, vertical = 10.dp),
+                modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(BrandPink)
+                    .padding(horizontal = 22.dp, vertical = 12.dp),
             ) {
-                Text("▶ 実行プレビュー", color = Color.White, fontWeight = FontWeight.Bold)
+                SkeletonBar(104, color = Color.White.copy(alpha = 0.85f))
             }
         }
     }
