@@ -11,6 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -551,27 +555,116 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                 .padding(Tokens.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
+            // Visual help (user direction, 2026-11-15): icons and shapes
+            // carry the meaning, text only supports. Section heads get an
+            // emoji tile in a brand tint; flows are drawn as steps.
             @Composable
-            fun sectionTitle(text: String) {
-                Text(
-                    text,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                )
+            fun sectionHead(emoji: String, text: String, ink: Color) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
+                            .background(ink.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(emoji, fontSize = 19.sp) }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
             @Composable
             fun body(text: String) {
                 Text(text, style = MaterialTheme.typography.bodyMedium)
             }
+            @Composable
+            fun stepRow(num: Int, title: String, desc: String) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(Tokens.CardRadius)) {
+                    Row(
+                        modifier = Modifier.padding(Tokens.CardPadding),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier.size(28.dp).clip(CircleShape).background(Tokens.Pink),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                num.toString(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                desc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+            @Composable
+            fun stepArrow() {
+                Text(
+                    "▼",
+                    color = Tokens.Pink.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            @Composable
+            fun partCard(emoji: String, name: String, desc: String, ink: Color, modifier: Modifier) {
+                Card(modifier = modifier, shape = RoundedCornerShape(Tokens.CardRadius)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Box(
+                            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                                .background(ink.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(emoji, fontSize = 17.sp) }
+                        Spacer(Modifier.height(6.dp))
+                        Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            desc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            @Composable
+            fun troubleRow(emoji: String, ink: Color, text: String) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(
+                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                            .background(ink.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(emoji, fontSize = 17.sp) }
+                    Spacer(Modifier.width(10.dp))
+                    Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                }
+            }
 
-            sectionTitle("基本の流れ（3ステップ）")
-            body("1. 「＋ 新規」からサンプルを選ぶ（おすすめが近道）\n2. 編集画面で「▶ 実行プレビュー」を押して見え方を確かめる\n3. 「ホーム画面に追加」→ 設定画面で内容を決めて「この内容で決定」")
+            sectionHead("🧭", "基本の流れ（3ステップ）", Tokens.Pink)
+            stepRow(1, "サンプルを選ぶ", "「＋ 新規」から。おすすめが近道です")
+            stepArrow()
+            stepRow(2, "実行して確かめる", "編集画面で「▶ 実行プレビュー」を押す")
+            stepArrow()
+            stepRow(3, "ホーム画面に置く", "「ホーム画面に追加」→ 内容を決めて「この内容で決定」")
 
-            sectionTitle("ウィジェットが更新されるタイミング")
-            body("自動更新は最短30分ごと（Androidの仕組み）。ウィジェットをタップしてもその場で更新されます。時計などに表示される時刻は「更新された時点」のものです。")
+            sectionHead("🔄", "ウィジェットが更新されるタイミング", Tokens.Sky)
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("🕐", "自動更新", "最短30分ごと（Androidの仕組み）", Tokens.Sky, Modifier.weight(1f))
+                partCard("👆", "タップ更新", "ウィジェットを押すと、その場で更新", Tokens.Pink, Modifier.weight(1f))
+            }
+            troubleRow("💡", Tokens.Sky, "時計などに表示される時刻は「更新された時点」のものです。")
 
-            sectionTitle("スクリプトの書き方")
+            sectionHead("✏️", "スクリプトの書き方", Tokens.Purple)
             body("いちばん小さな形はこれです。")
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -589,14 +682,57 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 )
             }
-            body(
-                "使える部品: addText（文字）／ addStack（横並び・縦並び）／ addSpacer（余白）／ addDivider（区切り線）／ addImage（画像）／ addProgress（バー）／ addCanvas（自由な描画）／ addLink（リンク）\n" +
-                    "色は new Color(\"#c2185b\")、文字の大きさは Font.systemFont(14) / Font.boldSystemFont(14) です。\n" +
-                    "データ取得は await fetch(\"https://…\") でJSONが取れます。保存は Storage.get(キー) / Storage.set(キー, 値) で、スクリプトごとに残ります。\n" +
-                    "サンプルのコードを読むのが一番の近道です。気になるサンプルを開いて、数字や文字を1つ変えて実行してみてください。"
-            )
+            body("使える部品はこの8つ。")
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("🔤", "addText", "文字を出す", Tokens.Pink, Modifier.weight(1f))
+                partCard("🧱", "addStack", "横・縦に並べる", Tokens.Orange, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("↔️", "addSpacer", "余白をあける", Tokens.Purple, Modifier.weight(1f))
+                partCard("➖", "addDivider", "区切り線", Tokens.Sky, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("🖼️", "addImage", "画像を出す", Tokens.Orange, Modifier.weight(1f))
+                partCard("📊", "addProgress", "進み具合バー", Tokens.Pink, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("🎨", "addCanvas", "自由に描く", Tokens.Purple, Modifier.weight(1f))
+                partCard("🔗", "addLink", "リンクを置く", Tokens.Sky, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
+                partCard("🌐", "fetch", "ネットからデータを取る", Tokens.Sky, Modifier.weight(1f))
+                partCard("💾", "Storage", "値を保存する（スクリプトごと）", Tokens.Orange, Modifier.weight(1f))
+            }
+            body("色は new Color(\"#c2185b\")、文字の大きさは Font.systemFont(14) / Font.boldSystemFont(14) です。")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Tokens.CardRadius),
+                colors = CardDefaults.cardColors(containerColor = Tokens.Sky.copy(alpha = 0.10f)),
+            ) {
+                Row(modifier = Modifier.padding(Tokens.CardPadding), verticalAlignment = Alignment.Top) {
+                    Text("💡", fontSize = 18.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "サンプルのコードを読むのが一番の近道です。気になるサンプルを開いて、数字や文字を1つ変えて実行してみてください。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
 
-            sectionTitle("AIに書いてもらう")
+            sectionHead("🤖", "AIに書いてもらう", Tokens.Orange)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                listOf("① コピーする", "② AIに貼る", "③ コードを貼り戻す").forEachIndexed { i, label ->
+                    if (i > 0) {
+                        Text("→", color = Tokens.Orange, fontWeight = FontWeight.Bold)
+                    }
+                    Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                }
+            }
             body("ChatGPTやClaudeなどのAIに、下のプロンプトを貼って「作りたいもの」を書き足すと、Scriptletでそのまま動くコードを書いてもらえます。")
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -617,17 +753,15 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                     promptCopied = true
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (promptCopied) "✓ コピーしました" else "プロンプトをコピー") }
+            ) { Text(if (promptCopied) "✓ コピーしました" else "📋 プロンプトをコピー") }
 
-            sectionTitle("うまくいかないとき")
-            body(
-                "・エラーは行番号つきで表示されます。その行を見直してみてください。\n" +
-                    "・fetch は https のURLだけ使えます。通信が不安定なときは、もう一度実行すると通ることがあります。\n" +
-                    "・実行が長く終わらないときは、20秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。\n" +
-                    "・ウィジェットが「未設定」と出るときは、そのウィジェットを削除して、アプリから追加し直してください。"
-            )
+            sectionHead("🛠", "うまくいかないとき", Tokens.Orange)
+            troubleRow("🧭", Tokens.Pink, "エラーは行番号つきで表示されます。その行を見直してみてください。")
+            troubleRow("🔒", Tokens.Sky, "fetch は https のURLだけ使えます。通信が不安定なときは、もう一度実行すると通ることがあります。")
+            troubleRow("⏱", Tokens.Purple, "実行が長く終わらないときは、20秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。")
+            troubleRow("🧩", Tokens.Orange, "ウィジェットが「未設定」と出るときは、そのウィジェットを削除して、アプリから追加し直してください。")
 
-            sectionTitle("最初から体験し直す")
+            sectionHead("🔁", "最初から体験し直す", Tokens.Pink)
             body("初回に出てきた案内（オンボーディング）を、もう一度見ることができます。")
             Button(
                 onClick = onReplayOnboarding,
