@@ -33,6 +33,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +51,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
@@ -440,7 +446,7 @@ fun OnboardingScreen(
                         headline = "ホーム画面に置く",
                         sub = "「ホーム画面に追加」を押せば、もう完成です。",
                         reducedMotion = reducedMotion, active = active,
-                        hero = { HomeMock(variant = 1, reducedMotion = reducedMotion) },
+                        hero = { PlaceMock() },
                     )
                     10 -> PageShell(
                         headline = "毎日見る画面が、変わる",
@@ -729,7 +735,19 @@ private fun TrialPage(
                                 }
                             }
                         },
-                    ) { Text(if (running) "実行中…" else "▶ 実行してみる") }
+                    ) {
+                        if (running) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("実行中…")
+                        } else {
+                            Text("▶ 実行してみる")
+                        }
+                    }
                 }
             }
         }
@@ -812,7 +830,7 @@ private fun FinishPage(
         Spacer(Modifier.height(12.dp))
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             PraiseMotion(trigger = bounce, reducedMotion = reducedMotion) {
-                HomeMock(variant = 1, reducedMotion = reducedMotion)
+                StartMock(sampleName)
             }
         }
         Text(
@@ -1029,9 +1047,13 @@ private fun SampleListMock(reducedMotion: Boolean) {
 
 @Composable
 private fun PreviewMock(reducedMotion: Boolean) {
-    // Schematic only, same rule as the sample-list mock: the old version had
-    // a labeled, pulsing fake "▶ 実行プレビュー" button — on a page that
-    // only teaches the step, it read as the real button and invited taps.
+    // Step 2 teaches the editor's core loop, so — unlike the other step
+    // illustrations — the button here deliberately looks like the REAL
+    // ▶ 実行プレビュー button (user direction, 2026-11-15: it must be
+    // recognisable as the actual button, and the picture must show that
+    // pressing it renders the preview right here, on the same page).
+    // Everything else stays schematic, and the whole picture keeps its
+    // イラスト label so it is not mistaken for a working screen.
     val barColor = MaterialTheme.colorScheme.onSurface
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -1052,13 +1074,170 @@ private fun PreviewMock(reducedMotion: Boolean) {
                     SkeletonBar(96, heightDp = 9, color = barColor.copy(alpha = 0.18f))
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
+            // The real button, drawn faithfully: pink pill, ▶ and its label.
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(BrandPink)
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                    .padding(horizontal = 22.dp, vertical = 11.dp),
             ) {
-                SkeletonBar(104, color = Color.White.copy(alpha = 0.85f))
+                Text(
+                    "▶ 実行プレビュー",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
+            Text(
+                "▼",
+                color = BrandPink,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+            // The preview appears right here, in the same page.
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(BrandOrange))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "プレビュー",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = BrandPink,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    SkeletonBar(150, heightDp = 10, color = barColor.copy(alpha = 0.35f))
+                    Spacer(Modifier.height(6.dp))
+                    SkeletonBar(104, heightDp = 10, color = barColor.copy(alpha = 0.22f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "押すと、その場でここに表示されます",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Step 3's illustration: the PLACING action — a widget card coming down
+ *  into an empty slot on the home screen. (Until v0.16.2 this page reused
+ *  the finished-home-screen picture, which made three pages in a row look
+ *  identical; user report 2026-11-15.) */
+@Composable
+private fun PlaceMock() {
+    val slotColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "イラスト（手順の説明）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.End),
+        )
+        Spacer(Modifier.height(6.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // App-icon-like squares: the rest of the home screen, abstracted.
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    listOf(BrandPink, BrandSky, BrandPurple, BrandOrange).forEach { c ->
+                        Box(
+                            Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
+                                .background(c.copy(alpha = 0.5f)),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                // The widget card, on its way down.
+                Card(
+                    modifier = Modifier.width(190.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF16283F)),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Box(Modifier.size(9.dp).clip(CircleShape).background(BrandPink))
+                        Spacer(Modifier.height(7.dp))
+                        SkeletonBar(96, heightDp = 10, color = Color.White.copy(alpha = 0.75f))
+                        Spacer(Modifier.height(5.dp))
+                        SkeletonBar(64, heightDp = 9, color = Color.White.copy(alpha = 0.4f))
+                    }
+                }
+                Text(
+                    "▼",
+                    color = BrandPink,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 5.dp),
+                )
+                // The empty slot it lands in.
+                Box(
+                    modifier = Modifier.width(190.dp).height(58.dp)
+                        .drawBehind {
+                            drawRoundRect(
+                                color = slotColor,
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 9f)),
+                                ),
+                                cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx()),
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "ここに置く",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+/** The finish page's hero: not the home screen (that is the expectation
+ *  page's picture) but the very sample the user is about to open — the
+ *  "this is what you make first" card. */
+@Composable
+private fun StartMock(sampleName: String?) {
+    val emoji = if (sampleName != null) sampleName.substringBefore(' ') else "✍️"
+    val title = if (sampleName != null) sampleName.substringAfter(' ', sampleName) else "まっさらなスクリプト"
+    Card(
+        modifier = Modifier.width(280.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(emoji, fontSize = 52.sp)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "あなたの最初のウィジェット",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

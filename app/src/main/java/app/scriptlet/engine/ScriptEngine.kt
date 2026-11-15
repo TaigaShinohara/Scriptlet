@@ -178,25 +178,31 @@ class ScriptEngine(private val store: ScriptStore) {
         require(url.startsWith("https://") || url.startsWith("http://")) {
             "fetch: http/https のURLだけ使えます"
         }
-        // One automatic retry on a read/connect timeout: far-away free APIs
-        // (and sleepy mobile networks) time out transiently, and a single
-        // timeout used to surface as a hard "取得に失敗: Read timed out" in
-        // widgets whose data source was actually fine.
+        // One automatic retry on a read/connect timeout (far-away free APIs
+        // time out transiently), but under ONE overall deadline: the old
+        // per-attempt timeouts (10s connect + 20s read, then a retry) could
+        // hold a run for 20s+ while the UI gave up at 20s — the weather
+        // preview "did nothing for 20 seconds, then errored" on a healthy
+        // API (user report, 2026-11-15). The whole fetch now resolves
+        // within FETCH_DEADLINE_MS, comfortably inside the UI's budget.
+        val deadline = System.nanoTime() + FETCH_DEADLINE_MS * 1_000_000L
         var lastTimeout: java.net.SocketTimeoutException? = null
         repeat(2) {
+            val remainingMs = (deadline - System.nanoTime()) / 1_000_000L
+            if (remainingMs < 2_000L) return@repeat
             try {
-                return httpGetOnce(url)
+                return httpGetOnce(url, remainingMs)
             } catch (e: java.net.SocketTimeoutException) {
                 lastTimeout = e
             }
         }
-        throw lastTimeout!!
+        throw lastTimeout ?: java.net.SocketTimeoutException("fetch timed out")
     }
 
-    private fun httpGetOnce(url: String): String {
+    private fun httpGetOnce(url: String, budgetMs: Long): String {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 10_000
-        conn.readTimeout = 20_000
+        conn.connectTimeout = minOf(6_000L, budgetMs).toInt()
+        conn.readTimeout = minOf(9_000L, budgetMs).toInt()
         conn.instanceFollowRedirects = true
         conn.setRequestProperty("User-Agent", "Scriptlet")
         try {
@@ -220,5 +226,8 @@ class ScriptEngine(private val store: ScriptStore) {
 
         /** A run in flight longer than this is treated as wedged; its slot is recycled for the next run. */
         const val WEDGE_MS = 30_000L
+
+        /** Overall budget for one fetch() call, retries included (see httpGet). */
+        const val FETCH_DEADLINE_MS = 16_000L
     }
 }
