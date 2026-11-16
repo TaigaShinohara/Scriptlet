@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">Scriptlet</string>
     <string name="widget_description">JavaScriptスクリプトの内容を表示するウィジェット</string>
+    <string name="widget_label_small">Scriptlet 小</string>
+    <string name="widget_label_large">Scriptlet 大</string>
+    <string name="widget_description_small">小さなJavaScriptウィジェット（2×2）</string>
+    <string name="widget_description_large">大きなJavaScriptウィジェット（4×4）</string>
     <string name="preview_subtitle">JSウィジェット</string>
     <string name="preview_line_tasks">タスクや予定を表示</string>
     <string name="preview_line_charts">グラフや達成率も</string>

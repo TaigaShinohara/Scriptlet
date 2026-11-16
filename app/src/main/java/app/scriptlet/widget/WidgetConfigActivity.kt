@@ -64,7 +64,7 @@ class WidgetConfigActivity : ComponentActivity() {
     // instance after configuring it — targeted suppression, with the reason.
     @android.annotation.SuppressLint("RestrictedApi")
     private suspend fun refreshWidget(appWidgetId: Int) {
-        ScriptletWidget().update(this, AppWidgetId(appWidgetId))
+        WidgetKinds.widgetFor(this, appWidgetId).update(this, AppWidgetId(appWidgetId))
     }
 
     companion object {

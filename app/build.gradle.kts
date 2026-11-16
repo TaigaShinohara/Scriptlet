@@ -1,8 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Persistent signing key: the default debug keystore lives in the build
+// machine's home directory and is silently regenerated whenever that machine
+// is replaced, which changed the APK signature on every batch (updates then
+// refuse to install, and reinstalled apps come back in the stopped state
+// where widget providers cannot run). The key now lives in the project's
+// .local/ (gitignored, never committed) so the signature is stable forever.
+val signingPropsFile = rootProject.file(".local/signing.properties")
+val signingProps = Properties().apply {
+    if (signingPropsFile.exists()) signingPropsFile.inputStream().use { load(it) }
+}
+val hasPersistentSigning = signingPropsFile.exists() &&
+    rootProject.file(".local/scriptlet.keystore").exists()
 
 android {
     namespace = "app.scriptlet"
@@ -13,13 +28,28 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.16.5-helpvisual"
+        versionCode = 28
+        versionName = "0.17.0-widgetkinds"
+    }
+
+    signingConfigs {
+        if (hasPersistentSigning) {
+            create("persistent") {
+                storeFile = rootProject.file(".local/scriptlet.keystore")
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (hasPersistentSigning) signingConfig = signingConfigs.getByName("persistent")
+        }
         release {
             isMinifyEnabled = false
+            if (hasPersistentSigning) signingConfig = signingConfigs.getByName("persistent")
         }
     }
     compileOptions {

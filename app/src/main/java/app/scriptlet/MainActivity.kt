@@ -75,7 +75,6 @@ import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.ui.Tokens
 import app.scriptlet.ui.WidgetPreview
-import app.scriptlet.widget.ScriptletWidget
 import app.scriptlet.widget.ScriptletWidgetReceiver
 import app.scriptlet.widget.WidgetConfigActivity
 import kotlinx.coroutines.launch
@@ -181,10 +180,16 @@ fun refreshWidgetsAsync(context: Context) {
     val appContext = context.applicationContext
     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
         val manager = AppWidgetManager.getInstance(appContext)
-        val ids = manager.getAppWidgetIds(ComponentName(appContext, ScriptletWidgetReceiver::class.java))
-        val widget = ScriptletWidget()
-        ids.forEach { id ->
-            runCatching { widget.update(appContext, androidx.glance.appwidget.AppWidgetId(id)) }
+        // All three size kinds: each placed widget is updated through the
+        // implementation class that owns its provider.
+        app.scriptlet.widget.WidgetKinds.receiverClasses.forEach { receiver ->
+            val ids = manager.getAppWidgetIds(ComponentName(appContext, receiver))
+            ids.forEach { id ->
+                runCatching {
+                    app.scriptlet.widget.WidgetKinds.widgetFor(appContext, id)
+                        .update(appContext, androidx.glance.appwidget.AppWidgetId(id))
+                }
+            }
         }
     }
 }

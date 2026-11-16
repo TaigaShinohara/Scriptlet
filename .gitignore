@@ -24,3 +24,6 @@ local.properties
 
 # Preset authoring/validation scratch (canonical source is SampleScripts.kt)
 /preset-work/
+
+# Persistent local signing key (never commit — see docs/SIGNING.md)
+.local/

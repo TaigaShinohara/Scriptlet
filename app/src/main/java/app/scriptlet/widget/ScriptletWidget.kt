@@ -22,24 +22,62 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.text.Text
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import app.scriptlet.data.ScriptItem
 import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.ScriptEngine
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Tap on the widget re-runs its script. */
 class RefreshAction : ActionCallback {
+    @android.annotation.SuppressLint("RestrictedApi") // AppWidgetId: see BaseScriptletWidget
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        ScriptletWidget().update(context, glanceId)
+        val appWidgetId = (glanceId as? AppWidgetId)?.appWidgetId ?: return
+        // The instance that owns this widget id depends on which size kind it
+        // is; updating through the wrong class silently does nothing.
+        WidgetKinds.widgetFor(context, appWidgetId).update(context, glanceId)
     }
 }
 
-class ScriptletWidget : GlanceAppWidget() {
+/** The three widget size kinds and their receivers, in picker order. */
+object WidgetKinds {
+    val receiverClasses: List<Class<out BaseScriptletWidgetReceiver>> = listOf(
+        ScriptletWidgetSmallReceiver::class.java,
+        ScriptletWidgetReceiver::class.java,
+        ScriptletWidgetLargeReceiver::class.java,
+    )
 
-    override val sizeMode: SizeMode =
-        SizeMode.Responsive(setOf(DpSize(160.dp, 100.dp), DpSize(250.dp, 140.dp)))
+    /** The widget implementation that owns [appWidgetId], by its provider. */
+    fun widgetFor(context: Context, appWidgetId: Int): GlanceAppWidget {
+        val providerClass = try {
+            android.appwidget.AppWidgetManager.getInstance(context)
+                .getAppWidgetInfo(appWidgetId)?.provider?.className
+        } catch (t: Throwable) {
+            null
+        }
+        return when (providerClass) {
+            ScriptletWidgetSmallReceiver::class.java.name -> ScriptletWidgetSmall()
+            ScriptletWidgetLargeReceiver::class.java.name -> ScriptletWidgetLarge()
+            else -> ScriptletWidget()
+        }
+    }
+}
+
+private const val WIDGET_RUN_BUDGET_MS = 12_000L
+
+/** Everything provideGlance needs, computed before composition starts. */
+private class PreparedWidget(
+    val script: ScriptItem?,
+    val mappedId: String?,
+    val result: RunResult?,
+    val images: Map<String, android.graphics.Bitmap>,
+    val options: WidgetOptions,
+)
+
+abstract class BaseScriptletWidget : GlanceAppWidget() {
 
     // Glance 1.1.1 marks AppWidgetId @RestrictTo(LIBRARY_GROUP), yet casting the
     // GlanceId to it is the only public way to learn which widget instance is
@@ -48,46 +86,40 @@ class ScriptletWidget : GlanceAppWidget() {
     @android.annotation.SuppressLint("RestrictedApi")
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = (id as? AppWidgetId)?.appWidgetId
-        val store = app.scriptlet.data.StoreProvider.get(context)
-        val config = WidgetConfigStore(context)
-        val scripts = store.scripts.value
-        // The per-instance mapping is the ONLY source of truth for what this
-        // widget shows. There is deliberately no fallback to another script:
-        // an unconfigured instance used to render whichever script had been
-        // edited most recently, so placed widgets silently turned into
-        // different widgets than the one chosen for them.
-        val mappedId = appWidgetId?.let { config.scriptIdFor(it) }
-        val script = mappedId?.let { mid -> scripts.firstOrNull { it.id == mid } }
-
-        // Last-resort guard: nothing in here may escape provideGlance, or the
-        // widget would sit on its placeholder forever with no explanation.
-        val result: RunResult? = try {
-            if (script != null) {
-                ScriptEngine(store).run(script.id, script.code)
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            RunResult.Error("実行に失敗: ${e.message}", null, emptyList())
+        // NOTHING may escape provideGlance. The launcher also runs this code
+        // to render the picker's live preview, and any throwable — including
+        // Errors, not just Exceptions — makes the launcher report
+        // 「ウィジェットを追加できませんでした」 and refuse the widget.
+        // So the whole preparation phase is guarded, and a failure degrades
+        // to a plain tappable placeholder instead of a dead widget.
+        val prepared: PreparedWidget? = try {
+            prepare(context, appWidgetId)
+        } catch (t: Throwable) {
+            null
         }
-
-        val images = if (result is RunResult.Success) {
-            try {
-                app.scriptlet.engine.ImageResolver.resolveAll(result.tree)
-            } catch (e: Exception) {
-                emptyMap()
+        if (prepared == null) {
+            provideContent {
+                Box(
+                    modifier = GlanceModifier.fillMaxSize().clickable(
+                        actionStartActivity(
+                            ComponentName(context, app.scriptlet.MainActivity::class.java),
+                        ),
+                    ),
+                ) {
+                    Text("Scriptlet")
+                }
             }
-        } else {
-            emptyMap()
+            return
         }
-
-        val options = appWidgetId?.let { config.optionsFor(it) } ?: WidgetOptions()
+        val script = prepared.script
+        val result = prepared.result
+        val options = prepared.options
         provideContent {
             var frame: GlanceModifier = GlanceModifier.fillMaxSize()
             val bgColor = options.bgHex?.let {
                 try {
                     androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(it))
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
                     null
                 }
             }
@@ -114,7 +146,7 @@ class ScriptletWidget : GlanceAppWidget() {
             Box(modifier = tapAction) {
                 when {
                     script != null && result is RunResult.Success ->
-                        GlanceTree(result.tree, images, textScale = options.textScale)
+                        GlanceTree(result.tree, prepared.images, textScale = options.textScale)
                     script != null && result is RunResult.Error -> Text(
                         text = "エラー: ${result.message}" +
                             (result.line?.let { "（${it}行目）" } ?: ""),
@@ -122,7 +154,7 @@ class ScriptletWidget : GlanceAppWidget() {
                     )
                     script != null -> Text("Scriptlet")
                     appWidgetId == null -> Text("Scriptlet")
-                    mappedId == null -> Text(
+                    prepared.mappedId == null -> Text(
                         "未設定のウィジェットです。タップでアプリを開きます。" +
                             "直すには、このウィジェットを削除して追加し直してください。",
                         maxLines = 6,
@@ -136,14 +168,89 @@ class ScriptletWidget : GlanceAppWidget() {
             }
         }
     }
+
+    private suspend fun prepare(context: Context, appWidgetId: Int?): PreparedWidget {
+        val store = app.scriptlet.data.StoreProvider.get(context)
+        val config = WidgetConfigStore(context)
+        val scripts = store.scripts.value
+        // The per-instance mapping is the ONLY source of truth for what this
+        // widget shows. There is deliberately no fallback to another script:
+        // an unconfigured instance used to render whichever script had been
+        // edited most recently, so placed widgets silently turned into
+        // different widgets than the one chosen for them.
+        val mappedId = appWidgetId?.let { config.scriptIdFor(it) }
+        val script = mappedId?.let { mid -> scripts.firstOrNull { it.id == mid } }
+
+        val result: RunResult? = if (script != null) {
+            // Run on the engine's own scope with a hard budget: a slow fetch
+            // must never hold the Glance session open until the launcher
+            // gives up on the widget (that, too, surfaces as
+            // 「追加できませんでした」). The detached run keeps going in the
+            // background; its result is simply not used for this render.
+            try {
+                withTimeoutOrNull(WIDGET_RUN_BUDGET_MS) {
+                    ScriptEngine(store).runDetached(script.id, script.code).await()
+                } ?: RunResult.Error(
+                    "読み込みが制限時間を超えました。タップで再実行できます",
+                    null,
+                    emptyList(),
+                )
+            } catch (t: Throwable) {
+                RunResult.Error("実行に失敗: ${t.message}", null, emptyList())
+            }
+        } else {
+            null
+        }
+
+        val images = if (result is RunResult.Success) {
+            try {
+                app.scriptlet.engine.ImageResolver.resolveAll(result.tree)
+            } catch (t: Throwable) {
+                emptyMap()
+            }
+        } else {
+            emptyMap()
+        }
+
+        val options = appWidgetId?.let { config.optionsFor(it) } ?: WidgetOptions()
+        return PreparedWidget(script, mappedId, result, images, options)
+    }
 }
 
-class ScriptletWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = ScriptletWidget()
+/** Standard kind: 4×2. The original widget — existing placements keep working. */
+class ScriptletWidget : BaseScriptletWidget() {
+    override val sizeMode: SizeMode =
+        SizeMode.Responsive(setOf(DpSize(160.dp, 100.dp), DpSize(250.dp, 140.dp)))
+}
 
+/** Small kind: 2×2, for one-glance numbers and clocks. */
+class ScriptletWidgetSmall : BaseScriptletWidget() {
+    override val sizeMode: SizeMode =
+        SizeMode.Responsive(setOf(DpSize(110.dp, 110.dp), DpSize(160.dp, 110.dp)))
+}
+
+/** Large kind: 4×4, for calendars, charts and boards. */
+class ScriptletWidgetLarge : BaseScriptletWidget() {
+    override val sizeMode: SizeMode =
+        SizeMode.Responsive(setOf(DpSize(250.dp, 140.dp), DpSize(340.dp, 260.dp)))
+}
+
+abstract class BaseScriptletWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
         val config = WidgetConfigStore(context)
         appWidgetIds.forEach { config.remove(it) }
     }
+}
+
+class ScriptletWidgetReceiver : BaseScriptletWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = ScriptletWidget()
+}
+
+class ScriptletWidgetSmallReceiver : BaseScriptletWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = ScriptletWidgetSmall()
+}
+
+class ScriptletWidgetLargeReceiver : BaseScriptletWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = ScriptletWidgetLarge()
 }
