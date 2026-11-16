@@ -28,8 +28,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 28
-        versionName = "0.17.0-widgetkinds"
+        versionCode = 29
+        versionName = "0.17.1-previewimg"
     }
 
     signingConfigs {
