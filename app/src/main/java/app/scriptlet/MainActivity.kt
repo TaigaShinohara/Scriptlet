@@ -45,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -135,7 +136,7 @@ fun EmojiTile(name: String, seed: String, size: Dp = 48.dp, emojiSize: Int = 24)
     val tint = tileTints[(seed.hashCode() and Int.MAX_VALUE) % tileTints.size]
     Box(
         modifier = Modifier.size(size)
-            .background(tint.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+            .background(tint.copy(alpha = 0.16f), RoundedCornerShape(16.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (emoji != null) {
@@ -384,7 +385,7 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(28.dp),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
@@ -413,7 +414,7 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                                     showChooser = false
                                     onNew(sampleName, sampleCode, sampleDesc)
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 ),
@@ -467,7 +468,7 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                                 showChooser = false
                                 onNew("新しいスクリプト", "// ここにスクリプトを書く\nconst widget = new ListWidget();\n", "")
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             ),
@@ -567,7 +568,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             fun sectionHead(emoji: String, text: String, ink: Color) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
+                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(14.dp))
                             .background(ink.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center,
                     ) { Text(emoji, fontSize = 19.sp) }
@@ -628,7 +629,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                 Card(modifier = modifier, shape = RoundedCornerShape(Tokens.CardRadius)) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Box(
-                            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(13.dp))
                                 .background(ink.copy(alpha = 0.14f)),
                             contentAlignment = Alignment.Center,
                         ) { Text(emoji, fontSize = 17.sp) }
@@ -646,7 +647,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             fun troubleRow(emoji: String, ink: Color, text: String) {
                 Row(verticalAlignment = Alignment.Top) {
                     Box(
-                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(13.dp))
                             .background(ink.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center,
                     ) { Text(emoji, fontSize = 17.sp) }
@@ -989,6 +990,7 @@ private fun EditorScreen(
                 onValueChange = { name = it },
                 label = { Text("スクリプト名") },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
@@ -997,6 +999,14 @@ private fun EditorScreen(
                 label = { Text("JavaScript") },
                 modifier = Modifier.fillMaxWidth().height(340.dp),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                // The code sits on a soft rounded "paper" (ART_DIRECTION v2):
+                // monospace stays inside the paper, the frame stays friendly.
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                ),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

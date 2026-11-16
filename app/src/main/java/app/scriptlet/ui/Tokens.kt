@@ -21,9 +21,9 @@ object Tokens {
     /** Neutral grey used for progress tracks and unfilled areas. */
     val TrackGray = Color(0xFFE5E7EB)
 
-    /** Dark slate of the widget mock cards (the "home screen" world). */
-    val SlateDark = Color(0xFF111827)
-    val SlateFrame = Color(0xFF1F2937)
+    /** Soft dusk plum of the widget mock cards (the "home screen" world). */
+    val SlateDark = Color(0xFF2A2135)
+    val SlateFrame = Color(0xFF3B2D47)
 
     /** Sub text inside the onboarding phone mock (mock world only). */
     val MockTextSub = Color(0xFFCBD5E1)
@@ -35,9 +35,10 @@ object Tokens {
     const val PINK_ARGB: Long = 0xFFC2185B
     const val TRACK_GRAY_ARGB: Long = 0xFFE5E7EB
 
-    // Shape and spacing: one radius for cards, one screen padding, an
-    // 8/12/16 spacing ladder — no in-between values.
-    val CardRadius = 16.dp
+    // Shape and spacing: one generous radius for cards (ART_DIRECTION v2:
+    // round and soft everywhere), one screen padding, an 8/12/16 spacing
+    // ladder — no in-between values.
+    val CardRadius = 24.dp
     val ScreenPadding = 16.dp
     val CardPadding = 16.dp
     val ItemSpacing = 12.dp

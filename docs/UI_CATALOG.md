@@ -4,7 +4,8 @@ UIを作る／調整するときは、まずこのカタログから流用先を
 
 ## 共通ルール
 
-- カードの角丸は Tokens.CardRadius（16dp）、画面端と カード内の余白は 16dp、要素間は 8／12／16 の段でそろえる。
+- カードの角丸は Tokens.CardRadius（24dp、ART_DIRECTION v2 で 16→24 に拡大）、画面端と カード内の余白は 16dp、要素間は 8／12／16 の段でそろえる。部品全体の角丸は Theme の SoftShapes（10／14／20／28／36）が底上げする。
+- 編集画面のコード面は「紙」パターン（v0.18.0〜）: OutlinedTextField に角丸20dp＋surfaceVariant の面色＋outlineVariant の枠。狙い: 等幅フォントを内側に閉じ込め、無骨なコード画面に見せない。
 - 塗りボタン（Button）は1画面に1つ＝その画面の主役。相方は OutlinedButton か TextButton に降格する。
 - 選択中は「2dpピンク枠＋primaryContainerの淡色＋✓」の3点セットで示す（色だけに頼らない）。
 

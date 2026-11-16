@@ -28,8 +28,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "0.17.3-templates-pro"
+        versionCode = 32
+        versionName = "0.18.0-design-cute"
     }
 
     signingConfigs {

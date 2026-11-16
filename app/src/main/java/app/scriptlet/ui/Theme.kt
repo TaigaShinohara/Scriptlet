@@ -1,17 +1,21 @@
 package app.scriptlet.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
-// Full brand schemes (docs/ART_DIRECTION.md): a quiet neutral base, pink as
-// the single hero colour, orange/purple/sky only in their roles. Every role
-// including containers is defined — leaving Material's baseline containers
-// in place made selected cards glow stock-lavender, off-world for this app.
-// Dark variants are the same roles in their brighter form.
+// Brand schemes (docs/ART_DIRECTION.md v2: beautiful, cute, approachable —
+// never rugged). The base is a warm white with soft pink-tinted surfaces in
+// light mode, and a soft plum (never hard black/slate) in dark mode. Pink
+// stays the single hero colour; orange/purple/sky keep their roles. Every
+// role including background/surface is defined — leaving Material's stock
+// surfaces in place read as a cold engineer dashboard, off-world here.
 private val LightScheme = lightColorScheme(
     primary = Color(0xFFC2185B),
     onPrimary = Color.White,
@@ -25,6 +29,13 @@ private val LightScheme = lightColorScheme(
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFFF1E6F7),
     onTertiaryContainer = Color(0xFF4A1168),
+    background = Color(0xFFFFFBF7),
+    onBackground = Color(0xFF3D2C34),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF3D2C34),
+    surfaceVariant = Color(0xFFF9EDF2),
+    onSurfaceVariant = Color(0xFF6B5560),
+    outlineVariant = Color(0xFFEDD9E2),
 )
 
 private val DarkScheme = darkColorScheme(
@@ -40,12 +51,30 @@ private val DarkScheme = darkColorScheme(
     onTertiary = Color(0xFF33154D),
     tertiaryContainer = Color(0xFF2F2140),
     onTertiaryContainer = Color(0xFFECD9F7),
+    background = Color(0xFF211722),
+    onBackground = Color(0xFFF3E6EE),
+    surface = Color(0xFF2C2130),
+    onSurface = Color(0xFFF3E6EE),
+    surfaceVariant = Color(0xFF3A2C40),
+    onSurfaceVariant = Color(0xFFD8C4D2),
+    outlineVariant = Color(0xFF4A3A52),
+)
+
+// One rounding ladder for every component (buttons, chips, fields, cards),
+// so nothing on screen keeps a hard corner.
+private val SoftShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(36.dp),
 )
 
 @Composable
 fun ScriptletTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) DarkScheme else LightScheme,
+        shapes = SoftShapes,
         content = content,
     )
 }

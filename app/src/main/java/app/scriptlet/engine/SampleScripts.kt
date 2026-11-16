@@ -55,9 +55,10 @@ object SampleScripts {
 
     val all: List<Pair<String, String>> = listOf(
         "🌤 東京の天気（実データ）" to """
-// プリセット: 東京の天気 3.0（Open-Meteo、APIキー不要の実データ）
-// JSの限界への挑戦号: 時間帯で変わるテーマ色、Canvasに描く24時間の気温曲線＋
-// 降水確率バー、太陽の弧、7日間予報（気温レンジ・バー）、Storageキャッシュ。
+// プリセット: 東京の天気 3.1（Open-Meteo、APIキー不要の実データ）
+// 3.0の全機能（気温曲線・降水確率・太陽の弧・7日間予報）に、アプリと同じ
+// 「美しく・かわいい」世界のパレットを適用。時間帯で変わるテーマ色、
+// Canvas描画、Storageキャッシュ（圏外でも前回データを出す）。
 function codeInfo(c) {
   if (c === 0) return ["☀️", "快晴"];
   if (c <= 2) return ["🌤️", "晴れ"];
@@ -128,14 +129,16 @@ async function loadWeather() {
 
 const now = new Date();
 const hour = now.getHours();
-// The theme follows the time of day: night / morning / day / dusk.
+// Soft palettes by time of day: night is a gentle indigo (a beautiful sky,
+// not a rugged navy); morning/day/dusk are light pastels with warm ink.
 const PALETTES = [
-  { bg: "#101c2c", accent: "#7cc7f0" },
-  { bg: "#31435c", accent: "#ffab7a" },
-  { bg: "#20607e", accent: "#aee7ff" },
-  { bg: "#43304e", accent: "#f78fb8" },
+  { bg: "#34365E", ink: "#FFFFFF", sub: "#C9CDF2", accent: "#FFC7DD", curve: "#AEE7FF", precip: "#8FD0F5", track: "#ffffff2e", todayHi: "#ffffff22", warn: "#FFAB7A" },
+  { bg: "#FFE9D2", ink: "#5B4232", sub: "#9A7B5F", accent: "#E65100", curve: "#E8873A", precip: "#3FA9D9", track: "#5b42331f", todayHi: "#ffffff80", warn: "#E65100" },
+  { bg: "#DFF4FC", ink: "#23485C", sub: "#5E8296", accent: "#0277BD", curve: "#2E97C9", precip: "#3FA9D9", track: "#23485c1f", todayHi: "#ffffff80", warn: "#E65100" },
+  { bg: "#F9DCE9", ink: "#55263F", sub: "#96617C", accent: "#C2185B", curve: "#D6337C", precip: "#7A6FD0", track: "#55263f1f", todayHi: "#ffffff80", warn: "#C2185B" },
 ];
 const pal = PALETTES[hour < 5 || hour >= 19 ? 0 : hour < 10 ? 1 : hour < 16 ? 2 : 3];
+const NOW_LINE = "#F08A3C";
 
 const widget = new ListWidget();
 widget.backgroundColor = new Color(pal.bg);
@@ -158,7 +161,7 @@ try {
       : "更新 " + pad2(now.getHours()) + ":" + pad2(now.getMinutes())
   );
   upd.font = Font.systemFont(10);
-  upd.textColor = new Color(loaded.cachedAt > 0 ? "#ffab7a" : "#cbd5e1");
+  upd.textColor = new Color(loaded.cachedAt > 0 ? pal.warn : pal.sub);
 
   // ---- Hero: condition + big temperature ----
   widget.addSpacer(6);
@@ -170,16 +173,16 @@ try {
   em.font = Font.systemFont(30);
   const temp = big.addText(" " + Math.round(d.current.temperature_2m) + "°");
   temp.font = Font.boldSystemFont(34);
-  temp.textColor = new Color("#ffffff");
+  temp.textColor = new Color(pal.ink);
   const lab = big.addText(" " + info[1]);
   lab.font = Font.systemFont(14);
-  lab.textColor = new Color("#e0f2fb");
+  lab.textColor = new Color(pal.sub);
   const feel = big.addText(
     "  体感 " + Math.round(d.current.apparent_temperature) + "° ／ " +
     Math.round(d.daily.temperature_2m_max[0]) + "°-" + Math.round(d.daily.temperature_2m_min[0]) + "°"
   );
   feel.font = Font.systemFont(11);
-  feel.textColor = new Color("#cbd5e1");
+  feel.textColor = new Color(pal.sub);
 
   // ---- Canvas 1: 24h temperature curve + precipitation probability ----
   widget.addSpacer(8);
@@ -194,19 +197,19 @@ try {
   const yFor = function (t) { return plotB - (plotB - plotT) * ((t - tMin) / (tMax - tMin)); };
   for (let h = 0; h < 24; h++) {
     const p = probs[h] || 0;
-    if (p > 0) cv.rect(xFor(h) - 3, barBase - Math.round(p * 0.14), 6, Math.round(p * 0.14), "#4dd0e1");
-    if (h > 0) cv.line(xFor(h - 1), yFor(temps[h - 1]), xFor(h), yFor(temps[h]), "#aee7ff", 2);
+    if (p > 0) cv.rect(xFor(h) - 3, barBase - Math.round(p * 0.14), 6, Math.round(p * 0.14), pal.precip);
+    if (h > 0) cv.line(xFor(h - 1), yFor(temps[h - 1]), xFor(h), yFor(temps[h]), pal.curve, 2);
   }
-  for (let h = 0; h < 24; h += 3) cv.circle(xFor(h), yFor(temps[h]), 2, "#ffffff");
+  for (let h = 0; h < 24; h += 3) cv.circle(xFor(h), yFor(temps[h]), 2, pal.ink);
   const nowX = xFor(hour + now.getMinutes() / 60);
-  cv.line(nowX, 8, nowX, barBase, "#ffab7a", 2);
-  cv.circle(nowX, yFor(d.current.temperature_2m), 3, "#ffab7a");
-  cv.text(plotL, 0, Math.round(tMax) + "°", 9, "#e0f2fb", false);
-  cv.text(plotL, plotB - 2, Math.round(tMin) + "°", 9, "#9fb6c9", false);
+  cv.line(nowX, 8, nowX, barBase, NOW_LINE, 2);
+  cv.circle(nowX, yFor(d.current.temperature_2m), 3, NOW_LINE);
+  cv.text(plotL, 0, Math.round(tMax) + "°", 9, pal.ink, false);
+  cv.text(plotL, plotB - 2, Math.round(tMin) + "°", 9, pal.sub, false);
   const pMax = Math.max.apply(null, probs.concat([0]));
-  if (pMax > 0) cv.text(plotR - 52, barBase - 16, "降水 " + pMax + "%", 9, "#4dd0e1", false);
+  if (pMax > 0) cv.text(plotR - 52, barBase - 16, "降水 " + pMax + "%", 9, pal.precip, false);
   const hourMarks = [0, 6, 12, 18, 23];
-  for (const hm of hourMarks) cv.text(xFor(hm) - 6, 66, hm + "時", 8, "#9fb6c9", false);
+  for (const hm of hourMarks) cv.text(xFor(hm) - 6, 66, hm + "時", 8, pal.sub, false);
 
   // ---- Canvas 2: the sun's arc ----
   const riseMin = Number(String(d.daily.sunrise[0]).slice(11, 13)) * 60 + Number(String(d.daily.sunrise[0]).slice(14, 16));
@@ -215,26 +218,26 @@ try {
   const sunT = Math.max(0, Math.min(1, (nowMin - riseMin) / Math.max(1, setMin - riseMin)));
   const sc = widget.addCanvas(W, 40);
   const cx = 152, horizon = 32, rx = 128, ry = 24;
-  sc.line(8, horizon, 296, horizon, "#5b7a94", 1);
+  sc.line(8, horizon, 296, horizon, pal.sub, 1);
   let px = cx - rx, py = horizon;
   for (let i = 1; i <= 24; i++) {
     const a = Math.PI * (i / 24);
     const x = cx - rx * Math.cos(a);
     const y = horizon - ry * Math.sin(a);
-    sc.line(px, py, x, y, "#ffb74d", 2);
+    sc.line(px, py, x, y, "#F5A623", 2);
     px = x; py = y;
   }
   const sunA = Math.PI * sunT;
   const sunX = cx - rx * Math.cos(sunA);
   const sunY = horizon - ry * Math.sin(sunA);
-  sc.circle(sunX, sunY, nowMin >= riseMin && nowMin <= setMin ? 5 : 3, "#ffd54f");
+  sc.circle(sunX, sunY, nowMin >= riseMin && nowMin <= setMin ? 5 : 3, "#FFB300");
   const dayLen = setMin - riseMin;
   const sunLine = widget.addText(
     "🌅 " + String(d.daily.sunrise[0]).slice(11, 16) + "　🌇 " + String(d.daily.sunset[0]).slice(11, 16) +
     "　☀️ 日照 " + Math.floor(dayLen / 60) + "時間" + pad2(dayLen % 60) + "分"
   );
   sunLine.font = Font.systemFont(11);
-  sunLine.textColor = new Color("#cbd5e1");
+  sunLine.textColor = new Color(pal.sub);
 
   // ---- Detail line: humidity / wind / pressure / UV ----
   const dir = DIRS[Math.round((d.current.wind_direction_10m || 0) / 22.5) % 16];
@@ -243,7 +246,7 @@ try {
     "　🧭気圧 " + Math.round(d.current.pressure_msl) + "hPa　☀️UV " + uvLabel(d.daily.uv_index_max[0])
   );
   det.font = Font.systemFont(11);
-  det.textColor = new Color("#cbd5e1");
+  det.textColor = new Color(pal.sub);
 
   // ---- Canvas 3: 7-day forecast with temperature range bars ----
   widget.addSpacer(8);
@@ -261,16 +264,16 @@ try {
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
     const y = 4 + i * 18;
     if (i === 0) {
-      fc.roundRect(0, y - 2, W, 17, 6, "#ffffff22");
-      fc.text(4, y + 1, "今日", 10, "#ffab7a", true);
+      fc.roundRect(0, y - 2, W, 17, 6, pal.todayHi);
+      fc.text(4, y + 1, "今日", 10, pal.warn, true);
     } else {
-      fc.text(4, y + 1, WD[date.getDay()] + "曜", 10, "#e0f2fb", false);
+      fc.text(4, y + 1, WD[date.getDay()] + "曜", 10, pal.ink, false);
     }
-    fc.text(36, y + 1, codeKanji(d.daily.weather_code[i]), 10, "#ffffff", false);
+    fc.text(36, y + 1, codeKanji(d.daily.weather_code[i]), 10, pal.ink, false);
     const rain = d.daily.precipitation_probability_max[i] || 0;
-    if (rain >= 30) fc.text(74, y + 1, rain + "%", 9, "#4dd0e1", false);
-    fc.text(100, y + 1, Math.round(d.daily.temperature_2m_min[i]) + "°", 10, "#9fb6c9", false);
-    fc.roundRect(barL, y + 3, barR - barL, 7, 3, "#ffffff2e");
+    if (rain >= 30) fc.text(74, y + 1, rain + "%", 9, pal.precip, false);
+    fc.text(100, y + 1, Math.round(d.daily.temperature_2m_min[i]) + "°", 10, pal.sub, false);
+    fc.roundRect(barL, y + 3, barR - barL, 7, 3, pal.track);
     const x1 = bx(d.daily.temperature_2m_min[i]);
     const x2 = bx(d.daily.temperature_2m_max[i]);
     const mid = (x1 + x2) / 2;
@@ -278,23 +281,23 @@ try {
     fc.roundRect(mid, y + 3, Math.max(3, x2 - mid), 7, 3, tempColor(d.daily.temperature_2m_max[i]));
     if (i === 0) {
       const cxNow = bx(d.current.temperature_2m);
-      fc.circle(cxNow, y + 6, 3, "#ffffff");
+      fc.circle(cxNow, y + 6, 3, pal.ink);
     }
-    fc.text(270, y + 1, Math.round(d.daily.temperature_2m_max[i]) + "°", 10, "#ffffff", true);
+    fc.text(270, y + 1, Math.round(d.daily.temperature_2m_max[i]) + "°", 10, pal.ink, true);
   }
 
   if (loaded.cachedAt > 0) {
     const note = widget.addText("※ 通信できないため、前回取得したデータを表示しています");
     note.font = Font.systemFont(10);
-    note.textColor = new Color("#ffab7a");
+    note.textColor = new Color(pal.warn);
   }
 } catch (e) {
   const err = widget.addText("取得に失敗: " + e.message);
   err.font = Font.systemFont(13);
-  err.textColor = new Color("#ffab7a");
+  err.textColor = new Color(pal.warn);
   const hint = widget.addText("通信できる場所で、ウィジェットをタップすると再取得します。");
   hint.font = Font.systemFont(11);
-  hint.textColor = new Color("#cbd5e1");
+  hint.textColor = new Color(pal.sub);
 }
 
 Script.setWidget(widget);
@@ -1035,12 +1038,21 @@ cap.textColor = new Color("#f78fb8");
 Script.setWidget(widget);
 """.trimIndent(),
         "⏳ 年末カウントダウン" to """
-// プリセット: 年末カウントダウン 3.0（JSの限界への挑戦号）
-// 三重リング（年・月・今日の経過）、残り時間の精密な内訳、12月カレンダー、
-// 月目盛りつき年プログレスバーを、すべてCanvasと日付計算だけで描く。
+// プリセット: 年末カウントダウン 3.1（アプリと同じ「美しく・かわいい」世界）
+// クリーム色の地に、パステルの三重リング（年・月・今日の経過）、残り時間の
+// 精密な内訳、12月カレンダー、月目盛りつき年プログレスバーをCanvasで描く。
 const widget = new ListWidget();
-widget.backgroundColor = new Color("#111827");
+widget.backgroundColor = new Color("#FFF6EC");
 widget.setPadding(14, 14, 14, 14);
+
+const INK = "#4A3428";
+const SUB = "#9A7B5F";
+const FAINT = "#C9AF97";
+const TRACK = "#F3E3CE";
+const PINK = "#F78FB8";
+const ORANGE = "#FFAB7A";
+const SKY = "#7CC7F0";
+const HOT = "#E65100";
 
 const now = new Date();
 const y = now.getFullYear();
@@ -1073,59 +1085,59 @@ for (let i = 0; i <= left; i++) {
 const row = widget.addStack();
 row.layoutHorizontally();
 
-// ---- Triple rings: year / month / day progress ----
+// ---- Triple rings: year / month / day progress (pastel) ----
 const cv = row.addCanvas(124, 124);
-cv.ring(62, 62, 53, 9, -90, 360, "#374151");
-cv.ring(62, 62, 53, 9, -90, 360 * yearFrac, "#f78fb8");
-cv.ring(62, 62, 41, 8, -90, 360, "#374151");
-cv.ring(62, 62, 41, 8, -90, 360 * monthFrac, "#ffab7a");
-cv.ring(62, 62, 30, 7, -90, 360, "#374151");
-cv.ring(62, 62, 30, 7, -90, 360 * dayFrac, "#7cc7f0");
+cv.ring(62, 62, 53, 9, -90, 360, TRACK);
+cv.ring(62, 62, 53, 9, -90, 360 * yearFrac, PINK);
+cv.ring(62, 62, 41, 8, -90, 360, TRACK);
+cv.ring(62, 62, 41, 8, -90, 360 * monthFrac, ORANGE);
+cv.ring(62, 62, 30, 7, -90, 360, TRACK);
+cv.ring(62, 62, 30, 7, -90, 360 * dayFrac, SKY);
 const pct = (yearFrac * 100).toFixed(1) + "%";
-cv.text(62 - (pct.length * 5.4), 48, pct, 16, "#ffffff", true);
-cv.text(45, 68, "今年の経過", 9, "#9ca3af", false);
+cv.text(62 - (pct.length * 5.4), 48, pct, 16, INK, true);
+cv.text(45, 68, "今年の経過", 9, SUB, false);
 
 const side = row.addStack();
 side.setPadding(8, 14, 0, 0);
 if (left === 0) {
   const t0 = side.addText("今日は大晦日！");
   t0.font = Font.boldSystemFont(20);
-  t0.textColor = new Color("#f78fb8");
+  t0.textColor = new Color("#DE5D8A");
   const t0b = side.addText(y + "年、最後の1日です");
   t0b.font = Font.systemFont(12);
-  t0b.textColor = new Color("#e5e7eb");
+  t0b.textColor = new Color(INK);
 } else {
   const t1 = side.addText(y + "年もあと");
   t1.font = Font.systemFont(13);
-  t1.textColor = new Color("#9ca3af");
+  t1.textColor = new Color(SUB);
   const t2 = side.addText(left + "日");
   t2.font = Font.boldSystemFont(38);
-  t2.textColor = new Color("#ffffff");
+  t2.textColor = new Color(INK);
   const t3 = side.addText("＝ " + weeks + "週間と" + extraDays + "日");
   t3.font = Font.systemFont(12);
-  t3.textColor = new Color("#f78fb8");
+  t3.textColor = new Color("#DE5D8A");
 }
 const t4 = side.addText("大晦日まで " + hoursLeft + "時間" + minsLeft + "分");
 t4.font = Font.systemFont(12);
-t4.textColor = new Color("#e5e7eb");
+t4.textColor = new Color(INK);
 const t5 = side.addText("今日は " + dayOfYear + " 日目 ／ 残りの土日 " + weekendLeft + "日");
 t5.font = Font.systemFont(12);
-t5.textColor = new Color("#9ca3af");
+t5.textColor = new Color(SUB);
 const legend = side.addText("◉ 年 · 月 · 今日 の経過");
 legend.font = Font.systemFont(10);
-legend.textColor = new Color("#6b7280");
+legend.textColor = new Color(FAINT);
 
-// ---- December calendar (Canvas): past days dim, today ringed, 31st pink ----
+// ---- December calendar (Canvas): past days faint, today ringed, 31st pink ----
 widget.addSpacer(10);
 const dec1 = new Date(y, 11, 1);
 const firstDow = dec1.getDay();
 const calW = 304, cellW = 40, cellH = 19, gridX = 12, gridY = 16;
 const rows = Math.ceil((firstDow + 31) / 7);
 const cal = widget.addCanvas(calW, gridY + rows * cellH + 4);
-cal.text(2, 0, "12月", 11, "#ffffff", true);
+cal.text(2, 0, "12月", 11, INK, true);
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
 for (let c = 0; c < 7; c++) {
-  cal.text(gridX + c * cellW + 8, 2, WD[c], 9, c === 0 ? "#f78fb8" : c === 6 ? "#7cc7f0" : "#6b7280", false);
+  cal.text(gridX + c * cellW + 8, 2, WD[c], 9, c === 0 ? "#DE5D8A" : c === 6 ? "#4FA3D1" : FAINT, false);
 }
 const inDecember = now.getMonth() === 11;
 for (let day = 1; day <= 31; day++) {
@@ -1135,15 +1147,15 @@ for (let day = 1; day <= 31; day++) {
   const isPast = inDecember && day < now.getDate();
   const isToday = inDecember && day === now.getDate();
   if (day === 31) {
-    cal.circle(cxp, cyp, 8, "#f78fb8");
-    cal.text(cxp - 6, cyp - 5, "31", 9, "#111827", true);
+    cal.circle(cxp, cyp, 8, PINK);
+    cal.text(cxp - 6, cyp - 5, "31", 9, "#FFFFFF", true);
   } else if (isToday) {
-    cal.ring(cxp, cyp, 8, 2, 0, 360, "#ffab7a");
-    cal.text(cxp - (day < 10 ? 3 : 6), cyp - 5, String(day), 9, "#ffab7a", true);
+    cal.ring(cxp, cyp, 8, 2, 0, 360, HOT);
+    cal.text(cxp - (day < 10 ? 3 : 6), cyp - 5, String(day), 9, HOT, true);
   } else {
     cal.text(
       cxp - (day < 10 ? 3 : 6), cyp - 5, String(day), 9,
-      isPast ? "#4b5563" : "#d1d5db", false
+      isPast ? "#DEC9B0" : "#6B4F3A", false
     );
   }
 }
@@ -1151,14 +1163,14 @@ for (let day = 1; day <= 31; day++) {
 // ---- Year progress bar with month ticks ----
 widget.addSpacer(6);
 const bar = widget.addCanvas(304, 26);
-bar.roundRect(0, 4, 304, 8, 4, "#374151");
-bar.roundRect(0, 4, Math.max(6, 304 * yearFrac), 8, 4, "#f78fb8");
+bar.roundRect(0, 4, 304, 8, 4, TRACK);
+bar.roundRect(0, 4, Math.max(6, 304 * yearFrac), 8, 4, PINK);
 for (let m = 1; m < 12; m++) {
   const tx = 304 * ((new Date(y, m, 1) - yearStart) / (nextYear - yearStart));
-  bar.line(tx, 4, tx, 12, "#111827", 1);
-  bar.text(tx - 3, 15, String(m + 1), 8, "#6b7280", false);
+  bar.line(tx, 4, tx, 12, "#FFF6EC", 1);
+  bar.text(tx - 3, 15, String(m + 1), 8, FAINT, false);
 }
-bar.text(0, 15, "1", 8, "#6b7280", false);
+bar.text(0, 15, "1", 8, FAINT, false);
 
 Script.setWidget(widget);
 """.trimIndent(),
