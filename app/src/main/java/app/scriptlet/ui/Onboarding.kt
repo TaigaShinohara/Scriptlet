@@ -93,21 +93,17 @@ private data class Worry(
     val buildKey: String?,
 )
 
+// Exactly three choices (skill v0.8.0): the two strongest concrete wishes
+// for this app — practical information at a glance, and decorating the home
+// screen — plus the mandatory escape hatch. The two build targets are
+// exactly the two bundled templates.
 private val worries = listOf(
     Worry(
-        label = "今週の予定を、パッと見たい",
-        mirror = "「今週の予定を、パッと見たい」",
-        strength = "月間カレンダーの完成品サンプルがあるから、置くだけで今月が一覧できます。",
-        trioOrder = listOf(1, 0, 2),
+        label = "天気や予定を、パッと見たい",
+        mirror = "「天気や予定を、パッと見たい」",
+        strength = "天気もカレンダーも、本物のデータを取って表示する完成品サンプルが揃っています。",
+        trioOrder = listOf(0, 1, 2),
         trialKey = "weekly-calendar",
-        buildKey = "weekly-calendar",
-    ),
-    Worry(
-        label = "天気や数字を、すぐチェックしたい",
-        mirror = "「天気や数字を、すぐチェックしたい」",
-        strength = "天気も進捗も、本物のデータを取って表示するサンプルが揃っています。",
-        trioOrder = listOf(0, 2, 1),
-        trialKey = "analog-clock",
         buildKey = "showcase-weather",
     ),
     Worry(
@@ -217,60 +213,23 @@ private fun PraiseMotion(trigger: Int, reducedMotion: Boolean, content: @Composa
 }
 
 /**
- * Ambient layer: at most two soft shapes drifting a few pixels on slow,
- * unsynchronised cycles — the page's air, never competing with the hero.
- * Stopped entirely under reduced motion.
+ * Staged entrance for the match page (skill v0.8.0 ordering): blocks arrive
+ * one after another — the mirrored words first, then the declaration, then
+ * the reason — 160ms apart, never all at once. A fade replaces the rise
+ * under reduced motion; the ORDER is kept either way.
  */
 @Composable
-private fun AmbientBackground(reducedMotion: Boolean, active: Boolean) {
-    if (reducedMotion || !active) return
-    val transition = rememberInfiniteTransition(label = "ambient")
-    val driftA by transition.animateFloat(
-        initialValue = -4f, targetValue = 4f,
-        animationSpec = infiniteRepeatable(tween(2900), RepeatMode.Reverse),
-        label = "driftA",
-    )
-    val driftB by transition.animateFloat(
-        initialValue = 3f, targetValue = -3f,
-        animationSpec = infiniteRepeatable(tween(3700), RepeatMode.Reverse),
-        label = "driftB",
-    )
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .offset(x = driftA.dp, y = driftB.dp)
-                .align(Alignment.TopEnd)
-                .padding(top = 70.dp, end = 26.dp)
-                .size(54.dp)
-                .clip(CircleShape)
-                .background(BrandPink.copy(alpha = 0.10f)),
-        )
-        Box(
-            modifier = Modifier
-                .offset(x = driftB.dp, y = driftA.dp)
-                .align(Alignment.BottomStart)
-                .padding(start = 22.dp, bottom = 150.dp)
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(BrandSky.copy(alpha = 0.10f)),
-        )
+private fun Staged(index: Int, reducedMotion: Boolean, content: @Composable () -> Unit) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(index * 160L)
+        shown = true
     }
-}
-
-/** Hero layer: a gentle float that keeps the page's hero alive and draws the eye to it. Static under reduced motion. */
-@Composable
-private fun HeroFloat(reducedMotion: Boolean, active: Boolean, content: @Composable () -> Unit) {
-    if (reducedMotion || !active) {
-        Box { content() }
-        return
-    }
-    val transition = rememberInfiniteTransition(label = "heroFloat")
-    val lift by transition.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(2600), RepeatMode.Reverse),
-        label = "lift",
+    val alpha by animateFloatAsState(if (shown) 1f else 0f, tween(260), label = "stagedAlpha")
+    val rise by animateFloatAsState(
+        if (shown) 0f else if (reducedMotion) 0f else 12f, tween(260), label = "stagedRise",
     )
-    Box(modifier = Modifier.offset(y = lift.dp)) { content() }
+    Box(modifier = Modifier.graphicsLayer { this.alpha = alpha; translationY = rise }) { content() }
 }
 
 /** Entrance for result pages: the reaction's afterglow carries into the page (fade + small rise). */
@@ -300,11 +259,13 @@ private fun PulseAlpha(reducedMotion: Boolean, content: @Composable (Float) -> U
 }
 
 /**
- * First-launch onboarding (mobile_onboarding skill v0.5): one claim per page;
- * questions and their results always live on separate pages; question pages
- * have no Next button — choosing reacts (praise trio) and auto-advances.
- * Every page carries two animation layers: a hero motion with a meaning and
- * a quiet ambient motion (max 2 elements, stopped under reduced motion).
+ * First-launch onboarding (mobile_onboarding skill v0.8.0): one claim per
+ * page; questions and their results always live on separate pages; question
+ * pages have no Next button — choosing reacts on the spot (praise trio),
+ * rests for a beat so the reaction can be read, and only then advances.
+ * Animation exists only where it means something: the praise reactions, the
+ * pulse on the one slot the hook page wants noticed, the staged entrance of
+ * the match page. No ambient loops, no floating heroes.
  */
 @Composable
 fun OnboardingScreen(
@@ -365,7 +326,6 @@ fun OnboardingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AmbientBackground(reducedMotion, active = true)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -394,12 +354,16 @@ fun OnboardingScreen(
                         onChoose = { w ->
                             worry = w
                             scope.launch {
-                                delay(350)
+                                // Reaction first, then a readable rest:
+                                // the praise lands on THIS page for ~1s
+                                // before the match page arrives (skill
+                                // v0.8.0: never show both at once).
+                                delay(1000)
                                 goToVerified(PAGE_WORRY, PAGE_MATCH)
                             }
                         },
                     )
-                    PAGE_MATCH -> ResultEntrance(reducedMotion) { MatchPage(worry, reducedMotion, active) }
+                    PAGE_MATCH -> MatchPage(worry, reducedMotion)
                     3 -> PageShell(
                         headline = "書くと、ウィジェットになる",
                         sub = "JavaScriptを書く。それだけでホーム画面の表示が作れます。",
@@ -419,10 +383,14 @@ fun OnboardingScreen(
                             trialResult = result
                             trialPraiseLine = line
                             scope.launch {
-                                delay(350)
+                                // Same ordering as the question page:
+                                // the success reaction rests ~1s on the
+                                // trial page before the result page.
+                                delay(1000)
                                 goToVerified(PAGE_TRIAL, PAGE_TRIAL_RESULT)
                             }
                         },
+                        onLater = { leaveToList() },
                     )
                     PAGE_TRIAL_RESULT -> ResultEntrance(reducedMotion) {
                         TrialResultPage(trialResult, trialPraiseLine)
@@ -520,7 +488,7 @@ private fun PageShell(
     ) {
         Spacer(Modifier.height(12.dp))
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            HeroFloat(reducedMotion, active) { hero() }
+            hero()
         }
         if (stepLabel != null) {
             Text(stepLabel, style = MaterialTheme.typography.labelLarge, color = BrandPink, fontWeight = FontWeight.Bold)
@@ -625,9 +593,13 @@ private fun WorryPage(
     }
 }
 
-/** Result page for the worry question: the match declaration alone, the user's own words mirrored, one strength. */
+/**
+ * Result page for the worry question: the match declaration alone.
+ * Entrance order (skill v0.8.0): the user's own words mirrored back FIRST,
+ * then the declaration, then the one strength — staged, never simultaneous.
+ */
 @Composable
-private fun MatchPage(worry: Worry?, reducedMotion: Boolean, active: Boolean) {
+private fun MatchPage(worry: Worry?, reducedMotion: Boolean) {
     val w = worry
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -635,36 +607,54 @@ private fun MatchPage(worry: Worry?, reducedMotion: Boolean, active: Boolean) {
     ) {
         Spacer(Modifier.height(12.dp))
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            HeroFloat(reducedMotion, active) { HomeMock(variant = 1, reducedMotion = reducedMotion) }
+            HomeMock(variant = 1, reducedMotion = reducedMotion)
         }
         if (w != null && w.mirror.isNotEmpty()) {
-            Text(
-                "そんなあなたには、Scriptletがぴったり",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
+            Staged(0, reducedMotion) {
+                Text(
+                    w.mirror,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BrandPink,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Staged(1, reducedMotion) {
+                Text(
+                    "そんなあなたには、Scriptletがぴったり",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(8.dp))
-            Text(
-                "${w.mirror} —— その希望、得意分野です。\n${w.strength}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+            Staged(2, reducedMotion) {
+                Text(
+                    w.strength,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         } else {
-            Text(
-                "まずは、動くところから",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
+            Staged(0, reducedMotion) {
+                Text(
+                    "まずは、動くところから",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(8.dp))
-            Text(
-                w?.strength ?: "決めなくて大丈夫。本物のサンプルが動くところから、見てみましょう。",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+            Staged(1, reducedMotion) {
+                Text(
+                    w?.strength ?: "決めなくて大丈夫。本物のサンプルが動くところから、見てみましょう。",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
     }
@@ -682,9 +672,20 @@ private fun TrialPage(
     haptics: (Int) -> Unit,
     reducedMotion: Boolean,
     onDone: (RunResult, String?) -> Unit,
+    onLater: () -> Unit,
 ) {
     var running by remember { mutableStateOf(false) }
     var bounce by remember { mutableIntStateOf(0) }
+    // "Try it later" (skill v0.8.0): choosing it ENDS the onboarding as
+    // completed — quietly, no celebration, no blame. The parent saves the
+    // completion flag on this exit path exactly like a normal finish.
+    var laterNote by remember { mutableStateOf(false) }
+    LaunchedEffect(laterNote) {
+        if (laterNote) {
+            delay(900)
+            onLater()
+        }
+    }
     val scope = rememberCoroutineScope()
     val sampleIdx = SampleScripts.keys.indexOf(worry?.trialKey ?: "daily-art").coerceAtLeast(0)
     Column(
@@ -748,6 +749,23 @@ private fun TrialPage(
                             Text("▶ 実行してみる")
                         }
                     }
+                }
+                Spacer(Modifier.height(14.dp))
+                if (laterNote) {
+                    Text(
+                        "あとで大丈夫。本体から、いつでも試せます",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                } else {
+                    OutlinedButton(
+                        enabled = !running,
+                        onClick = {
+                            haptics(1)
+                            laterNote = true
+                        },
+                    ) { Text("あとで試す") }
                 }
             }
         }
@@ -945,24 +963,9 @@ private fun CodeToWidgetMock(reducedMotion: Boolean) {
                 modifier = Modifier.padding(12.dp),
             )
         }
-        // Hero motion: the arrow nudges right — code becomes a widget.
-        if (reducedMotion) {
-            Text("→", style = MaterialTheme.typography.headlineMedium, color = BrandPink, fontWeight = FontWeight.Bold)
-        } else {
-            val transition = rememberInfiniteTransition(label = "arrow")
-            val nudge by transition.animateFloat(
-                initialValue = 0f, targetValue = 3f,
-                animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-                label = "nudge",
-            )
-            Text(
-                "→",
-                style = MaterialTheme.typography.headlineMedium,
-                color = BrandPink,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.offset(x = nudge.dp),
-            )
-        }
+        // The arrow is static: a perpetual nudge loop would be decoration,
+        // not meaning (skill v0.8.0). The direction reads fine standing still.
+        Text("→", style = MaterialTheme.typography.headlineMedium, color = BrandPink, fontWeight = FontWeight.Bold)
         MiniWidgetCard("Hello!", "Scriptlet", BrandPink, Modifier.weight(1f))
     }
 }

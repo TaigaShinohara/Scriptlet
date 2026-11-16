@@ -21,7 +21,7 @@ object SampleScripts {
 
     /** One-line descriptions, index-aligned with [keys]/[all]; shown wherever a script is picked. */
     val descs: List<String> = listOf(
-        "大阪の天気・気温グラフ・日の出入り（本物のデータ）",
+        "東京の天気・気温グラフ・日の出入り（本物のデータ）",
         "日本の最新地震を震度つきで表示（本物のデータ）",
         "過去30営業日のドル円を折れ線グラフで（本物のデータ）",
         "Canvasで目盛りと針まで描くアナログ時計",
@@ -40,14 +40,22 @@ object SampleScripts {
     /** The showcase presets: full real-world widgets, offered first when creating. */
     val featuredKeys: Set<String> = setOf("showcase-weather", "quake", "fx-chart", "analog-clock")
 
+    /**
+     * The bundled templates seeded into the script list on first launch
+     * (user direction, 2026-11-16: keep the out-of-box list to just these
+     * two). Everything else in [all] stays available from the
+     * "サンプルから作る" picker without being pre-seeded.
+     */
+    val templateKeys: Set<String> = setOf("showcase-weather", "showcase-countdown")
+
     fun descForName(name: String): String? {
         val idx = all.indexOfFirst { it.first == name }
         return if (idx >= 0) descs.getOrNull(idx) else null
     }
 
     val all: List<Pair<String, String>> = listOf(
-        "🌤 大阪の天気（実データ）" to """
-// プリセット: 大阪の天気 2.0（Open-Meteo、APIキー不要の実データ）
+        "🌤 東京の天気（実データ）" to """
+// プリセット: 東京の天気 2.0（Open-Meteo、APIキー不要の実データ）
 // fetch・Canvas棒グラフ・Storageキャッシュ（圏外でも前回データを出す）の組み合わせ
 function codeInfo(c) {
   if (c === 0) return ["☀️", "快晴"];
@@ -65,7 +73,7 @@ function codeInfo(c) {
 const pad2 = function (n) { return String(n).padStart(2, "0"); };
 
 async function loadWeather() {
-  const url = "https://api.open-meteo.com/v1/forecast?latitude=34.6937&longitude=135.5023&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&forecast_days=2&timezone=Asia%2FTokyo";
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=35.6762&longitude=139.6503&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&forecast_days=2&timezone=Asia%2FTokyo";
   try {
     const res = await fetch(url);
     const d = await res.json();
@@ -87,7 +95,7 @@ const now = new Date();
 const head = widget.addStack();
 head.layoutHorizontally();
 head.alignItems = "center";
-const title = head.addText("🌤 大阪の天気");
+const title = head.addText("🌤 東京の天気");
 title.font = Font.boldSystemFont(14);
 title.textColor = new Color("#7cc7f0");
 head.addSpacer();

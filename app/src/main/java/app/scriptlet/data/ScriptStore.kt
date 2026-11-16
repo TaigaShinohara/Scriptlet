@@ -34,14 +34,19 @@ class ScriptStore(context: Context) {
     init {
         val seededFile = File(dir, "seeded-samples.json")
         if (!indexFile.exists()) {
-            // First launch: seed the sample scripts.
+            // First launch: seed only the bundled templates (the full sample
+            // catalogue stays available from the "create from sample" picker).
+            // The seeded-keys file still records EVERY key, so the upgrade
+            // path below never auto-adds the non-template samples later.
             val now = System.currentTimeMillis()
             val seeds = app.scriptlet.engine.SampleScripts.all.mapIndexed { i, (name, code) ->
-                ScriptItem(
+                i to ScriptItem(
                     UUID.randomUUID().toString(), name, code, now - i,
                     app.scriptlet.engine.SampleScripts.descs.getOrElse(i) { "" },
                 )
-            }
+            }.filter { (i, _) ->
+                app.scriptlet.engine.SampleScripts.keys[i] in app.scriptlet.engine.SampleScripts.templateKeys
+            }.map { it.second }
             seeds.forEach { writeCode(it) }
             saveIndex(seeds)
             writeAtomic(seededFile, JSONArray(app.scriptlet.engine.SampleScripts.keys).toString())
@@ -58,8 +63,11 @@ class ScriptStore(context: Context) {
                 // Installs from before key tracking: the original samples were seeded at first launch.
                 mutableSetOf("hello", "weekly-calendar", "fetch")
             }
+            // Only templates auto-seed on upgrade too; new samples appear in
+            // the picker only, never uninvited in the list.
             val missing = app.scriptlet.engine.SampleScripts.all.filterIndexed { i, _ ->
-                app.scriptlet.engine.SampleScripts.keys[i] !in seeded
+                val key = app.scriptlet.engine.SampleScripts.keys[i]
+                key !in seeded && key in app.scriptlet.engine.SampleScripts.templateKeys
             }
             if (missing.isNotEmpty()) {
                 reload()
