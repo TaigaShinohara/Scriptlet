@@ -55,10 +55,10 @@ object SampleScripts {
 
     val all: List<Pair<String, String>> = listOf(
         "🌤 東京の天気（実データ）" to """
-// プリセット: 東京の天気 3.1（Open-Meteo、APIキー不要の実データ）
-// 3.0の全機能（気温曲線・降水確率・太陽の弧・7日間予報）に、アプリと同じ
-// 「美しく・かわいい」世界のパレットを適用。時間帯で変わるテーマ色、
-// Canvas描画、Storageキャッシュ（圏外でも前回データを出す）。
+// プリセット: 東京の天気 3.2（Open-Meteo、APIキー不要の実データ）
+// 3.1の全機能（気温曲線・降水確率・太陽の弧・7日間予報・時間帯パレット）に
+// 「キャッシュ優先」を追加：30分以内のデータが端末内にあれば通信せず即表示し、
+// 時間切れそのものを起きにくくした。古い時だけ取りに行き、失敗したら前回分を出す。
 function codeInfo(c) {
   if (c === 0) return ["☀️", "快晴"];
   if (c <= 2) return ["🌤️", "晴れ"];
@@ -108,21 +108,28 @@ async function loadWeather() {
     "&hourly=temperature_2m,precipitation_probability" +
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,uv_index_max" +
     "&forecast_days=7&timezone=Asia%2FTokyo";
+  // Cache-first: data younger than 30 minutes renders instantly with NO
+  // network at all, so a slow connection cannot time the widget out.
+  let cached = null;
+  const raw = Storage.get("wx_cache");
+  if (raw) {
+    try {
+      const d = JSON.parse(raw);
+      // Caches written by older versions lack the new fields; treat as a miss.
+      if (d.hourly && d.hourly.precipitation_probability && d.daily && d.daily.uv_index_max) {
+        cached = { d: d, cachedAt: Number(Storage.get("wx_cache_at") || 0), stale: false };
+      }
+    } catch (e) { /* broken cache: ignore and fetch */ }
+  }
+  if (cached && Date.now() - cached.cachedAt < 30 * 60 * 1000) return cached;
   try {
     const res = await fetch(url);
     const d = await res.json();
     Storage.set("wx_cache", JSON.stringify(d));
     Storage.set("wx_cache_at", String(Date.now()));
-    return { d: d, cachedAt: 0 };
+    return { d: d, cachedAt: 0, stale: false };
   } catch (e) {
-    const c = Storage.get("wx_cache");
-    if (c) {
-      const d = JSON.parse(c);
-      // Caches written by older versions lack the new fields; treat as a miss.
-      if (d.hourly && d.hourly.precipitation_probability && d.daily && d.daily.uv_index_max) {
-        return { d: d, cachedAt: Number(Storage.get("wx_cache_at") || 0) };
-      }
-    }
+    if (cached) { cached.stale = true; return cached; }
     throw e;
   }
 }
@@ -286,7 +293,7 @@ try {
     fc.text(270, y + 1, Math.round(d.daily.temperature_2m_max[i]) + "°", 10, pal.ink, true);
   }
 
-  if (loaded.cachedAt > 0) {
+  if (loaded.stale) {
     const note = widget.addText("※ 通信できないため、前回取得したデータを表示しています");
     note.font = Font.systemFont(10);
     note.textColor = new Color(pal.warn);

@@ -90,6 +90,11 @@ class WidgetConfigActivity : ComponentActivity() {
         val store = app.scriptlet.data.StoreProvider.get(this)
         val engine = ScriptEngine(store)
         val config = WidgetConfigStore(this)
+        // First-time setup (this widget had no script yet) counts as
+        // "adding": after deciding, go straight to the home screen so the
+        // user sees the widget where it landed (user request, 2026-11-17).
+        // Re-configuring an already-set widget stays in the app.
+        val wasConfigured = config.scriptIdFor(appWidgetId) != null
         val preselectId = intent?.extras?.getString(EXTRA_SCRIPT_ID)
             ?.takeIf { id -> store.scripts.value.any { it.id == id } }
             ?: config.scriptIdFor(appWidgetId)
@@ -318,6 +323,19 @@ class WidgetConfigActivity : ComponentActivity() {
                                 } catch (e: Exception) {
                                     // The mapping is saved; the periodic
                                     // update will still pick it up.
+                                }
+                                if (!wasConfigured) {
+                                    // Adding: jump to the home screen so
+                                    // the placed widget is right there.
+                                    try {
+                                        startActivity(
+                                            Intent(Intent.ACTION_MAIN)
+                                                .addCategory(Intent.CATEGORY_HOME)
+                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                        )
+                                    } catch (e: Exception) {
+                                        // No launcher to go to: just close.
+                                    }
                                 }
                                 finish()
                             }
