@@ -42,6 +42,22 @@ class RefreshAction : ActionCallback {
     }
 }
 
+/** Tap on an unconfigured widget opens its own config screen. */
+class ConfigureAction : ActionCallback {
+    @android.annotation.SuppressLint("RestrictedApi") // AppWidgetId: see BaseScriptletWidget
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters,
+    ) {
+        val appWidgetId = (glanceId as? AppWidgetId)?.appWidgetId ?: return
+        val intent = android.content.Intent(context, WidgetConfigActivity::class.java)
+            .putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+}
+
 /** The three widget size kinds and their receivers, in picker order. */
 object WidgetKinds {
     val receiverClasses: List<Class<out BaseScriptletWidgetReceiver>> = listOf(
@@ -66,7 +82,11 @@ object WidgetKinds {
     }
 }
 
-private const val WIDGET_RUN_BUDGET_MS = 12_000L
+// 18s: long enough for a slow weather fetch on a real device network
+// (the 12s cap made the widget show a timeout error while the same script
+// succeeded in the editor), short enough that the launcher never gives up
+// on the render — failures degrade to the guarded placeholder instead.
+private const val WIDGET_RUN_BUDGET_MS = 18_000L
 
 /** Everything provideGlance needs, computed before composition starts. */
 private class PreparedWidget(
@@ -132,10 +152,15 @@ abstract class BaseScriptletWidget : GlanceAppWidget() {
             if (options.paddingDp > 0) {
                 frame = frame.padding(options.paddingDp.dp)
             }
-            // A configured widget re-runs on tap; an unconfigured one opens
-            // the app instead, so the tap always does what its text promises.
+            // A configured widget re-runs on tap. An unconfigured one opens
+            // its OWN config screen (for this exact widget id), so a widget
+            // whose launcher configure flow never completed — or whose
+            // script was deleted — can be fixed in place, without the
+            // delete-and-re-add dance the old placeholder demanded.
             val tapAction = if (script != null) {
                 frame.clickable(actionRunCallback<RefreshAction>())
+            } else if (appWidgetId != null) {
+                frame.clickable(actionRunCallback<ConfigureAction>())
             } else {
                 frame.clickable(
                     actionStartActivity(
@@ -155,13 +180,12 @@ abstract class BaseScriptletWidget : GlanceAppWidget() {
                     script != null -> Text("Scriptlet")
                     appWidgetId == null -> Text("Scriptlet")
                     prepared.mappedId == null -> Text(
-                        "未設定のウィジェットです。タップでアプリを開きます。" +
-                            "直すには、このウィジェットを削除して追加し直してください。",
+                        "未設定のウィジェットです。タップで表示するスクリプトを選べます。",
                         maxLines = 6,
                     )
                     else -> Text(
                         "設定されたスクリプトが見つかりません（削除されたようです）。" +
-                            "タップでアプリを開きます。",
+                            "タップで選び直せます。",
                         maxLines = 6,
                     )
                 }

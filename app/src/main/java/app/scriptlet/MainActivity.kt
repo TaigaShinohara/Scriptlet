@@ -76,8 +76,16 @@ import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.ui.Tokens
 import app.scriptlet.ui.WidgetPreview
+import android.content.Intent
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.scriptlet.widget.ScriptletWidgetReceiver
 import app.scriptlet.widget.WidgetConfigActivity
+import app.scriptlet.widget.WidgetConfigStore
+import app.scriptlet.widget.WidgetKinds
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -272,6 +280,36 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
 private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
     val context = LocalContext.current
     val scripts by store.scripts.collectAsState()
+    // Placed-widget manager data: every widget instance on the home screen
+    // and the script it currently shows. Configuring from the list writes
+    // the same mapping the launcher's configure flow writes — a reliable
+    // path when that flow never completes on the device (user report,
+    // 2026-11-17: widgets stayed 「未設定」 and could not be set up).
+    // Refreshed on every ON_RESUME so returning from the config screen
+    // shows the new mapping.
+    var resumeTick by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) resumeTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val placedWidgets = remember(resumeTick, scripts) {
+        val manager = AppWidgetManager.getInstance(context)
+        val config = WidgetConfigStore(context)
+        WidgetKinds.receiverClasses.flatMap { cls ->
+            val kindLabel = when (cls.simpleName) {
+                "ScriptletWidgetSmallReceiver" -> "小"
+                "ScriptletWidgetLargeReceiver" -> "大"
+                else -> "標準"
+            }
+            manager.getAppWidgetIds(ComponentName(context, cls)).map { id ->
+                Triple(id, kindLabel, config.scriptIdFor(id))
+            }
+        }
+    }
     val fmt = remember { SimpleDateFormat("MM/dd HH:mm", Locale.JAPAN) }
     var showChooser by remember { mutableStateOf(false) }
     var pinNote by remember { mutableStateOf<String?>(null) }
@@ -337,6 +375,63 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                         )
                         TextButton(onClick = { showChooser = true }) {
                             Text("サンプルから作る →", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            if (placedWidgets.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(Tokens.CardRadius),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(Tokens.CardPadding)) {
+                            Text(
+                                "ホーム画面のウィジェット",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "置いてあるウィジェットと、表示中のスクリプトです。「設定する」からいつでも選び直せます。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            placedWidgets.forEach { (wid, kindLabel, mappedId) ->
+                                val scriptName = scripts.firstOrNull { it.id == mappedId }?.name
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "ウィジェット（$kindLabel）",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            scriptName ?: "未設定（スクリプトが選ばれていません）",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (scriptName != null) {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            } else {
+                                                MaterialTheme.colorScheme.secondary
+                                            },
+                                        )
+                                    }
+                                    TextButton(onClick = {
+                                        context.startActivity(
+                                            Intent(context, WidgetConfigActivity::class.java)
+                                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid),
+                                        )
+                                    }) {
+                                        Text("設定する", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -764,7 +859,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             sectionHead("🛠", "うまくいかないとき", Tokens.Orange)
             troubleRow("🧭", Tokens.Pink, "エラーは行番号つきで表示されます。その行を見直してみてください。")
             troubleRow("🔒", Tokens.Sky, "fetch は https のURLだけ使えます。通信が不安定なときは、もう一度実行すると通ることがあります。")
-            troubleRow("⏱", Tokens.Purple, "実行が長く終わらないときは、20秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。")
+            troubleRow("⏱", Tokens.Purple, "実行が長く終わらないときは、40秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。")
             troubleRow("🧩", Tokens.Orange, "ウィジェットが「未設定」と出るときは、そのウィジェットを削除して、アプリから追加し直してください。")
 
             sectionHead("🔁", "最初から体験し直す", Tokens.Pink)
@@ -1035,14 +1130,14 @@ private fun EditorScreen(
                         // stalls must surface as an error, never a dead button.
                         scope.launch {
                             try {
-                                result = kotlinx.coroutines.withTimeoutOrNull(20_000) {
+                                result = kotlinx.coroutines.withTimeoutOrNull(40_000) {
                                     // Detached (engine-owned job): a plain
                                     // child call would trap this timeout if
                                     // the run stalls in native code, and the
                                     // button would never recover.
                                     engine.runDetached(id, code).await()
                                 } ?: RunResult.Error(
-                                    "実行が20秒以内に終わりませんでした。通信や処理が詰まっている可能性があります。もう一度押してください。",
+                                    "実行が40秒以内に終わりませんでした。通信や処理が詰まっている可能性があります。もう一度押してください。",
                                     null, emptyList(),
                                 )
                             } catch (e: Exception) {

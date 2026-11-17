@@ -179,12 +179,13 @@ class ScriptEngine(private val store: ScriptStore) {
             "fetch: http/https のURLだけ使えます"
         }
         // One automatic retry on a read/connect timeout (far-away free APIs
-        // time out transiently), but under ONE overall deadline: the old
-        // per-attempt timeouts (10s connect + 20s read, then a retry) could
-        // hold a run for 20s+ while the UI gave up at 20s — the weather
-        // preview "did nothing for 20 seconds, then errored" on a healthy
-        // API (user report, 2026-11-15). The whole fetch now resolves
-        // within FETCH_DEADLINE_MS, comfortably inside the UI's budget.
+        // time out transiently), but under ONE overall deadline. The 2026-11-15
+        // fix capped this at 16s so a fetch could never outlive the UI's 20s
+        // budget — but on real device networks the weather API still hit the
+        // 9s read cap and errored (user report, 2026-11-17: 「時間切れで
+        // エラー」). The deadline is now 28s with a 14s read cap, and the
+        // editor's budget grew to 40s to stay comfortably outside it. Widget
+        // renders keep their own shorter budget and fall back to cache.
         val deadline = System.nanoTime() + FETCH_DEADLINE_MS * 1_000_000L
         var lastTimeout: java.net.SocketTimeoutException? = null
         repeat(2) {
@@ -201,8 +202,8 @@ class ScriptEngine(private val store: ScriptStore) {
 
     private fun httpGetOnce(url: String, budgetMs: Long): String {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = minOf(6_000L, budgetMs).toInt()
-        conn.readTimeout = minOf(9_000L, budgetMs).toInt()
+        conn.connectTimeout = minOf(8_000L, budgetMs).toInt()
+        conn.readTimeout = minOf(14_000L, budgetMs).toInt()
         conn.instanceFollowRedirects = true
         conn.setRequestProperty("User-Agent", "Scriptlet")
         try {
@@ -228,6 +229,6 @@ class ScriptEngine(private val store: ScriptStore) {
         const val WEDGE_MS = 30_000L
 
         /** Overall budget for one fetch() call, retries included (see httpGet). */
-        const val FETCH_DEADLINE_MS = 16_000L
+        const val FETCH_DEADLINE_MS = 28_000L
     }
 }
