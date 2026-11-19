@@ -1168,7 +1168,7 @@ private fun PlaceMock() {
                 // The widget card, on its way down.
                 Card(
                     modifier = Modifier.width(190.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF16283F)),
+                    colors = CardDefaults.cardColors(containerColor = Tokens.MockNavy),
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Box(Modifier.size(9.dp).clip(CircleShape).background(BrandPink))

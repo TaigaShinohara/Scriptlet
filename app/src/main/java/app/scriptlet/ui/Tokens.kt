@@ -31,6 +31,9 @@ object Tokens {
     /** Code tint inside the onboarding phone mock (mock world only). */
     val MockSky = Color(0xFFA5F3FC)
 
+    /** Deep navy card inside the onboarding phone mock (mock world only). */
+    val MockNavy = Color(0xFF16283F)
+
     // ARGB twins for non-Compose rendering (Glance).
     const val PINK_ARGB: Long = 0xFFC2185B
     const val TRACK_GRAY_ARGB: Long = 0xFFE5E7EB

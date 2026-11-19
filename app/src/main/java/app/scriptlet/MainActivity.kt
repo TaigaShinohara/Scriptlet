@@ -418,7 +418,12 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                                             color = if (scriptName != null) {
                                                 MaterialTheme.colorScheme.onSurfaceVariant
                                             } else {
-                                                MaterialTheme.colorScheme.secondary
+                                                // onSecondaryContainer, not
+                                                // secondary: raw orange text
+                                                // is 3.3:1 on this surface —
+                                                // under the 4.5:1 floor for
+                                                // small text (M3 audit).
+                                                MaterialTheme.colorScheme.onSecondaryContainer
                                             },
                                         )
                                     }
@@ -860,7 +865,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             troubleRow("🧭", Tokens.Pink, "エラーは行番号つきで表示されます。その行を見直してみてください。")
             troubleRow("🔒", Tokens.Sky, "fetch は https のURLだけ使えます。通信が不安定なときは、もう一度実行すると通ることがあります。")
             troubleRow("⏱", Tokens.Purple, "実行が長く終わらないときは、40秒でいったん区切ってエラーを表示します。詰まった実行は裏側で自動的に切り替わるので、少し待ってからもう一度押してください。")
-            troubleRow("🧩", Tokens.Orange, "ウィジェットが「未設定」と出るときは、そのウィジェットを削除して、アプリから追加し直してください。")
+            troubleRow("🧩", Tokens.Orange, "ウィジェットが「未設定」と出るときは、そのウィジェットをタップすると設定画面が開きます。削除して追加し直す必要はありません。一覧の上の「ホーム画面のウィジェット」からも設定できます。")
 
             sectionHead("🔁", "最初から体験し直す", Tokens.Pink)
             body("初回に出てきた案内（オンボーディング）を、もう一度見ることができます。")
@@ -1202,12 +1207,18 @@ private fun EditorScreen(
                 }
                 is RunResult.Error -> {
                     val errorLineText = r.line?.let { ln -> code.lines().getOrNull(ln - 1)?.trim() }
+                    // M3 feedback pattern: an error region is errorContainer
+                    // with onErrorContainer content (audit, 2026-11-19).
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(Tokens.CardRadius),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("エラー", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleSmall)
+                            Text("エラー", style = MaterialTheme.typography.titleSmall)
                             Text(
                                 (r.line?.let { "${it}行目: " } ?: "") + r.message,
                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -1216,7 +1227,6 @@ private fun EditorScreen(
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     "問題の文: $errorLineText",
-                                    color = MaterialTheme.colorScheme.error,
                                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                 )
                             }

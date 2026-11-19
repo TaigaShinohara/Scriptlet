@@ -28,8 +28,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 34
-        versionName = "0.18.2-cachehome"
+        versionCode = 35
+        versionName = "0.19.0-m3audit"
     }
 
     signingConfigs {
