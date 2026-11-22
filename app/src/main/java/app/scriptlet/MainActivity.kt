@@ -87,9 +87,6 @@ import app.scriptlet.widget.WidgetConfigActivity
 import app.scriptlet.widget.WidgetConfigStore
 import app.scriptlet.widget.WidgetKinds
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val store by lazy { app.scriptlet.data.StoreProvider.get(this) }
@@ -310,7 +307,6 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
             }
         }
     }
-    val fmt = remember { SimpleDateFormat("MM/dd HH:mm", Locale.JAPAN) }
     var showChooser by remember { mutableStateOf(false) }
     var pinNote by remember { mutableStateOf<String?>(null) }
 
@@ -350,35 +346,11 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
             ),
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
-            item {
-                // Welcome band: the app's promise and the easiest first step,
-                // so a first-time viewer thinks "I could do this too".
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(Tokens.CardRadius),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                ) {
-                    Column(modifier = Modifier.padding(Tokens.CardPadding)) {
-                        Text(
-                            "ホーム画面を、自分の道具に",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "スクリプトを選ぶと編集が始まります。まずはサンプルを「実行プレビュー」で試すのがおすすめ。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        TextButton(onClick = { showChooser = true }) {
-                            Text("サンプルから作る →", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
+            // Noise audit (2026-11-22): the welcome band is gone. Its
+            // headline repeated the onboarding hook verbatim and its body
+            // re-explained what the cards and the FAB already show; the
+            // list's job is picking a script, and the promise lives in the
+            // onboarding (its canonical place).
             if (placedWidgets.isNotEmpty()) {
                 item {
                     Card(
@@ -393,12 +365,6 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                                 "ホーム画面のウィジェット",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "置いてあるウィジェットと、表示中のスクリプトです。「設定する」からいつでも選び直せます。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             placedWidgets.forEach { (wid, kindLabel, mappedId) ->
                                 val scriptName = scripts.firstOrNull { it.id == mappedId }?.name
@@ -449,7 +415,6 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
             items(scripts, key = { it.id }) { item ->
                 ScriptCard(
                     item = item,
-                    updatedLabel = "更新 ${fmt.format(Date(item.updatedAt))}",
                     onOpen = { onOpen(item.id) },
                     onPin = {
                         pinNote = if (requestPinWidget(context, item.id)) {
@@ -492,12 +457,6 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                         "新しいスクリプト",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "選ぶだけですぐ使えます。あとから中身も自由に変えられます。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(Tokens.ItemSpacing))
                     Column(
@@ -579,14 +538,7 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
                             ) {
                                 EmojiTile(name = "✍️ まっさら", seed = "blank", size = 40.dp, emojiSize = 20)
                                 Spacer(Modifier.size(Tokens.ItemSpacing))
-                                Column {
-                                    Text("まっさらから書く", style = MaterialTheme.typography.titleMedium)
-                                    Text(
-                                        "空白のスクリプト。自分でコードを書きたい人向け",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text("まっさらから書く", style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
@@ -771,7 +723,6 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             troubleRow("💡", Tokens.Sky, "時計などに表示される時刻は「更新された時点」のものです。")
 
             sectionHead("✏️", "スクリプトの書き方", Tokens.Purple)
-            body("いちばん小さな形はこれです。")
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Tokens.CardRadius),
@@ -788,7 +739,6 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 )
             }
-            body("使える部品はこの8つ。")
             Row(horizontalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing)) {
                 partCard("🔤", "addText", "文字を出す", Tokens.Pink, Modifier.weight(1f))
                 partCard("🧱", "addStack", "横・縦に並べる", Tokens.Orange, Modifier.weight(1f))
@@ -839,7 +789,7 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                     Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 }
             }
-            body("ChatGPTやClaudeなどのAIに、下のプロンプトを貼って「作りたいもの」を書き足すと、Scriptletでそのまま動くコードを書いてもらえます。")
+            body("下のプロンプトに、作りたいものを書き足してAIに貼るだけです。")
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Tokens.CardRadius),
@@ -868,7 +818,6 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             troubleRow("🧩", Tokens.Orange, "ウィジェットが「未設定」と出るときは、そのウィジェットをタップすると設定画面が開きます。削除して追加し直す必要はありません。一覧の上の「ホーム画面のウィジェット」からも設定できます。")
 
             sectionHead("🔁", "最初から体験し直す", Tokens.Pink)
-            body("初回に出てきた案内（オンボーディング）を、もう一度見ることができます。")
             Button(
                 onClick = onReplayOnboarding,
                 modifier = Modifier.fillMaxWidth(),
@@ -886,7 +835,6 @@ private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
 @Composable
 private fun ScriptCard(
     item: ScriptItem,
-    updatedLabel: String,
     onOpen: () -> Unit,
     onPin: () -> Unit,
     onDuplicate: () -> Unit,
@@ -923,18 +871,16 @@ private fun ScriptCard(
                         maxLines = 2,
                     )
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    updatedLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Noise audit (2026-11-22): the "更新 MM/dd HH:mm" line is
+                // gone — it measured the script without helping identify
+                // or open it; name + summary carry the card.
             }
             IconButton(onClick = { menuOpen = true }) {
                 Text("⋮", style = MaterialTheme.typography.titleLarge)
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(text = { Text("開く") }, onClick = { menuOpen = false; onOpen() })
+                // No 「開く」 item: tapping the card itself opens it — the
+                // same action in two places is duplication (noise audit).
                 DropdownMenuItem(text = { Text("ホーム画面に追加") }, onClick = { menuOpen = false; onPin() })
                 DropdownMenuItem(text = { Text("複製") }, onClick = { menuOpen = false; onDuplicate() })
                 DropdownMenuItem(text = { Text("名前を変更") }, onClick = { menuOpen = false; renameText = item.name; renameOpen = true })
@@ -1080,11 +1026,9 @@ private fun EditorScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
-            Text(
-                "書く → ▶ 実行プレビュー → ホーム画面に追加、の順で完成です",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Noise audit (2026-11-22): the procedure hint line is gone.
+            // It re-stated the onboarding steps and the help flow on every
+            // editor visit; the two buttons below already show the order.
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -1108,19 +1052,16 @@ private fun EditorScreen(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 ),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
+            // Noise audit (2026-11-22): no standing status row. "✓ 保存済み"
+            // was a just-in-case display and the character count measured
+            // without helping; the unsaved state is the only one worth
+            // surfacing, so it appears only while dirty (post-hoc display).
+            if (isDirty()) {
                 Text(
-                    // Preview always runs the current text and saves first when
-                    // dirty, so there is no save button: this line states the
-                    // save state instead of asking for an action.
-                    if (isDirty()) "編集中（実行・戻るで自動保存されます）" else "✓ 保存済み",
+                    "未保存（実行か戻るで保存されます）",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text("${code.length} 文字", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             pasteNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

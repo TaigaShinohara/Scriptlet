@@ -219,7 +219,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             Spacer(Modifier.height(16.dp))
                             Text("プレビュー（外枠つき）", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "下の見た目を変えると、ここにも反映されます。実際の表示と少し異なる場合があります。",
+                                "実際の表示と少し異なる場合があります。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -261,11 +261,6 @@ class WidgetConfigActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(20.dp))
                         Text("見た目（任意）", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "スクリプトの中身とは別に、外枠だけ変えられます。変えなくても大丈夫です。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
 
                         @Composable
                         fun chipRow(
