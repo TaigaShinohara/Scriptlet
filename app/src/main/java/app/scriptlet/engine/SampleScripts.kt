@@ -16,7 +16,8 @@ object SampleScripts {
         "progress-demo",
         "stylish-clock",
         "showcase-countdown",
-        "hello"
+        "hello",
+        "anim-bounce"
     )
 
     /** One-line descriptions, index-aligned with [keys]/[all]; shown wherever a script is picked. */
@@ -34,7 +35,8 @@ object SampleScripts {
         "今日・今週・今月・今年の経過率をバーで表示",
         "大きな時計と今日の経過リング",
         "三重リングと12月カレンダーで今年の残りを表示",
-        "文字と現在時刻を出す、いちばん小さな例"
+        "文字と現在時刻を出す、いちばん小さな例",
+        "アニメ実験：跳ねるボール（アニメ専用ウィジェットで動く）"
     )
 
     /** The showcase presets: full real-world widgets, offered first when creating. */
@@ -1204,6 +1206,45 @@ const dow = "日月火水木金土"[now.getDay()];
 const date = widget.addText((now.getMonth() + 1) + "月" + now.getDate() + "日（" + dow + "）");
 date.font = Font.systemFont(12);
 date.textColor = new Color("#9ca3af");
+
+Script.setWidget(widget);
+""".trimIndent(),
+        "🎞 ゆらゆらボール（アニメ実験）" to """
+// プリセット: ゆらゆらボール（アニメ実験）
+// 「Scriptlet アニメ（実験）」ウィジェット専用。Script.animate でアニメ宣言し、
+// ホストが frame（コマ番号）と elapsedMs（開始からの経過）を渡して毎コマ再実行する。
+// 通常ウィジェットに置くと frame 0 の静止画になります。
+Script.animate({ fps: 5 });
+
+const widget = new ListWidget();
+const cv = widget.addCanvas(220, 130);
+
+const t = elapsedMs / 1000;
+
+// 紙（角丸・クリーム）
+cv.roundRect(0, 0, 220, 130, 24, "#FFF6EC");
+
+// 右上の掃引リング（オレンジ）
+const sweep = (t * 120) % 360;
+cv.ring(188, 30, 13, 5, -90, 360, "#FFEDD9");
+cv.ring(188, 30, 13, 5, -90, sweep, "#E65100");
+
+// 大きいボール（ピンク）: 左右に揺れながら跳ねる
+const bx = 104 + Math.sin(t * 1.4) * 66;
+const bounce = Math.abs(Math.sin(t * 2.6));
+const by = 98 - bounce * 42;
+cv.circle(bx, 113, 15 - bounce * 5, "#F3D9E2"); // 影
+cv.circle(bx, by, 17, "#F78FB8");
+cv.circle(bx - 6, by - 6, 6, "#FCE7F1"); // ハイライト
+
+// 小さいボール（紫）: 位相をずらして後を追う
+const sx = 104 + Math.sin(t * 1.4 - 1.2) * 66;
+const sbounce = Math.abs(Math.sin(t * 2.6 - 0.9));
+const sy = 102 - sbounce * 30;
+cv.circle(sx, sy, 9, "#CE9BE8");
+cv.circle(sx - 3, sy - 3, 3, "#F1E6F7");
+
+cv.text(12, 110, "frame " + frame, 11, "#6B5560", false);
 
 Script.setWidget(widget);
 """.trimIndent(),

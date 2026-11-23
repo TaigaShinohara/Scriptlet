@@ -64,6 +64,21 @@ class WidgetConfigActivity : ComponentActivity() {
     // instance after configuring it — targeted suppression, with the reason.
     @android.annotation.SuppressLint("RestrictedApi")
     private suspend fun refreshWidget(appWidgetId: Int) {
+        if (WidgetKinds.providerClassName(this, appWidgetId) ==
+            AnimWidgetReceiver::class.java.name
+        ) {
+            // Animation lane: render frame 0 right away, then hand over to
+            // the frame-swap service (started here, in the foreground, which
+            // is the one reliable FGS start point).
+            val engine = ScriptEngine(app.scriptlet.data.StoreProvider.get(this))
+            when (val outcome = AnimRenderer.renderOnce(this, engine, appWidgetId, 0, 0)) {
+                is AnimOutcome.Frame -> AnimRenderer.push(this, appWidgetId, outcome.bitmap)
+                is AnimOutcome.Still -> AnimRenderer.push(this, appWidgetId, outcome.bitmap)
+                AnimOutcome.Failed -> Unit
+            }
+            WidgetAnimator.start(this)
+            return
+        }
         WidgetKinds.widgetFor(this, appWidgetId).update(this, AppWidgetId(appWidgetId))
     }
 

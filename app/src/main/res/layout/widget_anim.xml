@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Animation-lane widget surface: a single image the AnimService swaps per
+     frame. No other views — RemoteViews re-inflation stays minimal. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/anim_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/widget_label_anim"
+        android:scaleType="fitCenter" />
+</FrameLayout>

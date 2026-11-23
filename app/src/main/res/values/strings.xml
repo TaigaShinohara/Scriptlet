@@ -4,6 +4,8 @@
     <string name="widget_description">JavaScriptスクリプトの内容を表示するウィジェット</string>
     <string name="widget_label_small">Scriptlet 小</string>
     <string name="widget_label_large">Scriptlet 大</string>
+    <string name="widget_label_anim">Scriptlet アニメ（実験）</string>
+    <string name="widget_description_anim">Canvasスクリプトをアニメーション表示する実験用ウィジェット</string>
     <string name="widget_description_small">小さなJavaScriptウィジェット（2×2）</string>
     <string name="widget_description_large">大きなJavaScriptウィジェット（4×4）</string>
     <string name="preview_subtitle">JSウィジェット</string>

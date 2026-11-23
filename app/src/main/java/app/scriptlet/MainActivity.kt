@@ -85,6 +85,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.scriptlet.widget.ScriptletWidgetReceiver
 import app.scriptlet.widget.WidgetConfigActivity
 import app.scriptlet.widget.WidgetConfigStore
+import app.scriptlet.widget.WidgetAnimator
 import app.scriptlet.widget.WidgetKinds
 import kotlinx.coroutines.launch
 
@@ -94,6 +95,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Animation lane: if animated widgets are placed, (re)start their
+        // frame service now — app-open is a reliable foreground start point,
+        // and WidgetAnimator no-ops when none exist.
+        WidgetAnimator.start(this)
         setContent {
             app.scriptlet.ui.ScriptletTheme {
                 androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize()) {
@@ -274,7 +279,9 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
+// internal (not private) so the JVM screenshot tests in this module can
+// render the real screen; no behaviour change.
+internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
     val context = LocalContext.current
     val scripts by store.scripts.collectAsState()
     // Placed-widget manager data: every widget instance on the home screen
@@ -296,7 +303,11 @@ private fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (Str
     val placedWidgets = remember(resumeTick, scripts) {
         val manager = AppWidgetManager.getInstance(context)
         val config = WidgetConfigStore(context)
-        WidgetKinds.receiverClasses.flatMap { cls ->
+        if (manager == null) {
+            // No widget service in this environment (e.g. JVM screenshot
+            // tests): the placed-widgets card simply has nothing to list.
+            emptyList()
+        } else WidgetKinds.receiverClasses.flatMap { cls ->
             val kindLabel = when (cls.simpleName) {
                 "ScriptletWidgetSmallReceiver" -> "小"
                 "ScriptletWidgetLargeReceiver" -> "大"
@@ -588,7 +599,8 @@ private const val AI_PROMPT = """あなたは「Scriptlet」というAndroidア�
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
+// internal for the JVM screenshot tests, same as ListScreen.
+internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var promptCopied by remember { mutableStateOf(false) }
@@ -925,7 +937,8 @@ private fun ScriptCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditorScreen(
+// internal for the JVM screenshot tests, same as ListScreen.
+internal fun EditorScreen(
     store: ScriptStore,
     engine: ScriptEngine,
     initial: ScriptItem?,

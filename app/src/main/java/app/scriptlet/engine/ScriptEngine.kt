@@ -23,7 +23,12 @@ import java.net.URL
 import java.util.Collections
 
 sealed interface RunResult {
-    data class Success(val tree: WidgetNode, val logs: List<String>) : RunResult
+    data class Success(
+        val tree: WidgetNode,
+        val logs: List<String>,
+        /** Set when the script declared Script.animate({fps}); null for still scripts. */
+        val animationFps: Int? = null,
+    ) : RunResult
     data class Error(val message: String, val line: Int?, val logs: List<String>) : RunResult
 }
 
@@ -72,7 +77,12 @@ class ScriptEngine(private val store: ScriptStore) {
     }
     private val detachedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    suspend fun run(scriptId: String, code: String): RunResult {
+    suspend fun run(
+        scriptId: String,
+        code: String,
+        frame: Int = 0,
+        elapsedMs: Long = 0,
+    ): RunResult {
         val mySlot = slot
         val finished = java.util.concurrent.atomic.AtomicBoolean(false)
         val guard = watchdog.schedule(
@@ -80,7 +90,7 @@ class ScriptEngine(private val store: ScriptStore) {
             WEDGE_MS, java.util.concurrent.TimeUnit.MILLISECONDS,
         )
         return try {
-            mySlot.mutex.withLock { runInternal(scriptId, code, mySlot.dispatcher) }
+            mySlot.mutex.withLock { runInternal(scriptId, code, mySlot.dispatcher, frame, elapsedMs) }
         } finally {
             finished.set(true)
             guard.cancel(false)
@@ -101,10 +111,21 @@ class ScriptEngine(private val store: ScriptStore) {
      * Deferred can be timed out promptly (it is not the caller's child job),
      * even when the run itself is stalled in native code.
      */
-    fun runDetached(scriptId: String, code: String): Deferred<RunResult> =
-        detachedScope.async { run(scriptId, code) }
+    fun runDetached(
+        scriptId: String,
+        code: String,
+        frame: Int = 0,
+        elapsedMs: Long = 0,
+    ): Deferred<RunResult> =
+        detachedScope.async { run(scriptId, code, frame, elapsedMs) }
 
-    private suspend fun runInternal(scriptId: String, code: String, dispatcher: CoroutineDispatcher): RunResult = withContext(dispatcher) {
+    private suspend fun runInternal(
+        scriptId: String,
+        code: String,
+        dispatcher: CoroutineDispatcher,
+        frame: Int = 0,
+        elapsedMs: Long = 0,
+    ): RunResult = withContext(dispatcher) {
         // JS callbacks can arrive from QuickJS job threads; keep the log list thread-safe.
         val logs = Collections.synchronizedList(mutableListOf<String>())
         val qjs = try {
@@ -143,7 +164,10 @@ class ScriptEngine(private val store: ScriptStore) {
                 null
             }
 
-            val wrapped = "(async () => {\n" + code +
+            // Frame globals ride on the wrapper's opening line so the error
+            // line offset (prelude lines + 2) is unchanged.
+            val wrapped = "(async () => { globalThis.frame = " + frame +
+                "; globalThis.elapsedMs = " + elapsedMs + ";\n" + code +
                 "\n;if (typeof widget !== 'undefined') { Script.setWidget(widget); }\n})()"
             val full = Prelude.SOURCE + "\n" + wrapped
 
@@ -158,7 +182,21 @@ class ScriptEngine(private val store: ScriptStore) {
                     "ウィジェットの内容が大きすぎます（${treeJson.length}文字）。表示する項目を減らしてください。",
                     null, logs.toList(),
                 )
-                else -> RunResult.Success(WidgetNode.fromJson(treeJson), logs.toList())
+                else -> {
+                    val animJson: String? = try {
+                        qjs.evaluate("JSON.stringify(globalThis.__animation || null)", "host.js", false)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val fps = animJson?.takeIf { it != "null" }?.let {
+                        try {
+                            org.json.JSONObject(it).optInt("fps", 0).takeIf { f -> f in 1..10 }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    RunResult.Success(WidgetNode.fromJson(treeJson), logs.toList(), fps)
+                }
             }
         } catch (e: QuickJsException) {
             val adjustedLine = e.lineNumber?.let { it - lineOffset }?.takeIf { it > 0 }

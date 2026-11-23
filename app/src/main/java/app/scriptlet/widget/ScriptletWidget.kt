@@ -66,14 +66,17 @@ object WidgetKinds {
         ScriptletWidgetLargeReceiver::class.java,
     )
 
+    /** The provider class name that owns [appWidgetId], or null when unknown. */
+    fun providerClassName(context: Context, appWidgetId: Int): String? = try {
+        android.appwidget.AppWidgetManager.getInstance(context)
+            .getAppWidgetInfo(appWidgetId)?.provider?.className
+    } catch (t: Throwable) {
+        null
+    }
+
     /** The widget implementation that owns [appWidgetId], by its provider. */
     fun widgetFor(context: Context, appWidgetId: Int): GlanceAppWidget {
-        val providerClass = try {
-            android.appwidget.AppWidgetManager.getInstance(context)
-                .getAppWidgetInfo(appWidgetId)?.provider?.className
-        } catch (t: Throwable) {
-            null
-        }
+        val providerClass = providerClassName(context, appWidgetId)
         return when (providerClass) {
             ScriptletWidgetSmallReceiver::class.java.name -> ScriptletWidgetSmall()
             ScriptletWidgetLargeReceiver::class.java.name -> ScriptletWidgetLarge()

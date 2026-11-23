@@ -231,7 +231,15 @@ globalThis.Color = Color;
 globalThis.Font = Font;
 globalThis.ListWidget = ListWidget;
 globalThis.Script = {
-  setWidget(w) { globalThis.__widgetTree = w && w.node ? w.node : w; }
+  setWidget(w) { globalThis.__widgetTree = w && w.node ? w.node : w; },
+  // Phase A (prototype): declare this script as animated. Only meaningful on
+  // the dedicated animation widget lane; normal widgets render frame 0 as a
+  // still image. While animating, the host re-runs the script per frame with
+  // the globals `frame` (0,1,2,...) and `elapsedMs` refreshed each time.
+  animate(opts) {
+    const f = opts && opts.fps ? (opts.fps | 0) : 5;
+    globalThis.__animation = { fps: Math.max(1, Math.min(10, f)) };
+  }
 };
 globalThis.console = {
   log: function() {

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Animation lane (Phase A): foreground service that swaps widget frames. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -54,6 +58,31 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/scriptlet_widget_info_large" />
         </receiver>
+
+        <receiver
+            android:name=".widget.AnimWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label_anim">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/scriptlet_widget_info_anim" />
+        </receiver>
+
+        <!-- Frame-swap loop for the animation lane. specialUse is the only
+             foreground-service type with no cumulative runtime cap (dataSync
+             is throttled to 6h/24h on Android 15+); the subtype property is
+             what Play reviewers read, so it states the use plainly. -->
+        <service
+            android:name=".widget.AnimService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="animated home screen widgets rendered from user scripts" />
+        </service>
 
         <activity
             android:name=".widget.WidgetConfigActivity"
