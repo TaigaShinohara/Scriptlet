@@ -27,3 +27,6 @@ local.properties
 
 # Persistent local signing key (never commit — see docs/SIGNING.md)
 .local/
+
+# ScriptStore data written by JVM screenshot tests (test-run debris)
+/app/scripts/

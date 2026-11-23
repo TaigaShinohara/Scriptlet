@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("app.cash.paparazzi")
 }
 
 // Persistent signing key: the default debug keystore lives in the build
@@ -28,8 +29,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.20.0-noise"
+        versionCode = 37
+        versionName = "0.21.0-animproto"
     }
 
     signingConfigs {
@@ -83,4 +84,8 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     // 1.0.14 is the newest line whose AAR accepts compileSdk 36 (1.0.16+ needs 37)
     implementation("io.github.dokar3:quickjs-kt-android:1.0.14")
+    // JVM screenshot tests (see app/src/test): renders the real Compose
+    // screens off-device so layout collapse / clipping is caught before
+    // delivery. Goldens live in app/src/test/snapshots.
+    testImplementation("app.cash.paparazzi:paparazzi:1.3.5")
 }
