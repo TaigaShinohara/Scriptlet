@@ -44,16 +44,24 @@ import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.splitLeadingEmoji
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The discovery feed: every bundled preset as a big card with a live
- * preview of the widget it draws, in the order the create-chooser uses
- * (featured first). Browsing is the point — each card actually runs its
- * script (best effort, one at a time as cards appear) so what you see is
- * what the home screen gets. 「入れる」 adds the preset to your scripts
- * and opens it in the editor, where it can be placed on the home screen;
- * a preset whose code is already in your list opens that copy instead.
+ * preview of the widget it draws — featured first, then the newest
+ * additions, then the rest. Browsing is the point — each card actually
+ * runs its script so what you see is what the home screen gets.
+ * 「入れる」 adds the preset to your scripts and opens it in the editor,
+ * where it can be placed on the home screen; a preset whose code is
+ * already in your list opens that copy instead.
+ *
+ * Keeping the feed light with 45 presets: LazyColumn only composes
+ * near-visible cards, and preview runs are serialized through [runGate]
+ * — one run at a time, and a card that scrolls away while queued is
+ * cancelled before it ever runs. Finished results are cached in
+ * [results] for the whole visit, so scrolling back never re-runs.
  *
  * Preview runs are keyed "feed-<sample key>" so their Storage (e.g. the
  * weather cache) persists across visits without colliding with the
@@ -74,9 +82,14 @@ internal fun FeedScreen(
     BackHandler(onBack = onBack)
     val scripts by store.scripts.collectAsState()
     val results = remember { mutableStateMapOf<String, RunResult>() }
+    val runGate = remember { Mutex() }
     val order = remember {
         SampleScripts.all.indices.sortedBy { idx ->
-            if (SampleScripts.keys[idx] in SampleScripts.featuredKeys) 0 else 1
+            when (SampleScripts.keys[idx]) {
+                in SampleScripts.featuredKeys -> 0
+                in SampleScripts.freshKeys -> 1
+                else -> 2
+            }
         }
     }
 
@@ -137,10 +150,17 @@ internal fun FeedScreen(
                 if (autoRun) {
                     LaunchedEffect(key) {
                         if (key !in results) {
-                            val r = withTimeoutOrNull(30_000) {
-                                engine.runDetached("feed-$key", code).await()
-                            } ?: RunResult.Error("プレビューの実行が時間切れになりました", null, emptyList())
-                            results[key] = r
+                            // Serialized: at most one preview run at a time.
+                            // withLock is cancellable, so a card that scrolls
+                            // away while queued drops out without running.
+                            runGate.withLock {
+                                if (key !in results) {
+                                    val r = withTimeoutOrNull(20_000) {
+                                        engine.runDetached("feed-$key", code).await()
+                                    } ?: RunResult.Error("プレビューの実行が時間切れになりました", null, emptyList())
+                                    results[key] = r
+                                }
+                            }
                         }
                     }
                 }

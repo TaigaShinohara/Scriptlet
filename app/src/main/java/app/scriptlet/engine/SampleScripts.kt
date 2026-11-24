@@ -17,7 +17,37 @@ object SampleScripts {
         "stylish-clock",
         "showcase-countdown",
         "hello",
-        "anim-bounce"
+        "anim-bounce",
+        "mandala",
+        "pixel-art",
+        "wave-scope",
+        "fractal-tree",
+        "orbit",
+        "maze",
+        "star-chart",
+        "on-this-day",
+        "umbrella",
+        "laundry",
+        "uv",
+        "sunrise",
+        "fx-quick",
+        "trash-day",
+        "next-holiday",
+        "birthday",
+        "savings",
+        "water",
+        "omikuji",
+        "gacha",
+        "level",
+        "boss",
+        "lunch",
+        "unsei",
+        "big-clock",
+        "date-only",
+        "week-progress",
+        "one-word",
+        "breathe",
+        "life-days"
     )
 
     /** One-line descriptions, index-aligned with [keys]/[all]; shown wherever a script is picked. */
@@ -36,11 +66,44 @@ object SampleScripts {
         "大きな時計と今日の経過リング",
         "三重リングと12月カレンダーで今年の残りを表示",
         "文字と現在時刻を出す、いちばん小さな例",
-        "アニメ実験：跳ねるボール（アニメ専用ウィジェットで動く）"
+        "アニメ実験：跳ねるボール（アニメ専用ウィジェットで動く）",
+        "日付で模様が変わる万華鏡アート（Canvas・ネット不要）",
+        "左右対称のドット絵モンスターを日替わり生成（Canvas）",
+        "重なる波が描くアート。更新するたび少し変化（Canvas）",
+        "再帰で育つ木。枝ぶりは日替わり（Canvas）",
+        "今日の惑星の位置を計算して描く（ネット不要）",
+        "毎日新しい迷路を生成（Canvas・ネット不要）",
+        "日替わりの星屑と想像の星座（Canvas）",
+        "歴史の今日を1件（Wikipedia・本物のデータ）",
+        "今日の降水確率だけを大きく表示（本物のデータ）",
+        "外干しできる？を天気から判定（本物のデータ）",
+        "今日の紫外線の強さと対策（本物のデータ）",
+        "日の出・日の入りと日の長さ（本物のデータ）",
+        "ドル・ユーロ・ポンドの対円レート（本物のデータ）",
+        "曜日で今日のゴミを判定（ルールは書き換え式）",
+        "次の祝日まであと何日（2027年分まで収録）",
+        "大切な日まであと何日（日付は書き換え式）",
+        "目標までの貯金の進み具合（金額は書き換え式）",
+        "時刻から今日の水分の目安を表示",
+        "日替わり運勢とラッキーアイテム",
+        "1日1回のレア引き気分（日替わり）",
+        "今年の経過日数＝あなたのレベル",
+        "週末までの距離をボス戦っぽく表示",
+        "今日のランチを日替わりで決定",
+        "12星座から今日いちばん運のいい星座",
+        "時刻を超大きく表示する一番シンプルな時計",
+        "月日と曜日だけを超大きく",
+        "月〜日の7マスで今週の進み具合",
+        "日替わりの短くてやさしい一文",
+        "円を見ながら呼吸を整える",
+        "生まれてから何日目か（誕生日は書き換え式）"
     )
 
     /** The showcase presets: full real-world widgets, offered first when creating. */
     val featuredKeys: Set<String> = setOf("showcase-weather", "quake", "fx-chart", "analog-clock")
+
+    /** Presets added 2026-11-25; the feed shows them right after the featured ones. */
+    val freshKeys: Set<String> = setOf("mandala", "pixel-art", "wave-scope", "fractal-tree", "orbit", "maze", "star-chart", "on-this-day", "umbrella", "laundry", "uv", "sunrise", "fx-quick", "trash-day", "next-holiday", "birthday", "savings", "water", "omikuji", "gacha", "level", "boss", "lunch", "unsei", "big-clock", "date-only", "week-progress", "one-word", "breathe", "life-days")
 
     /**
      * The bundled templates seeded into the script list on first launch
@@ -1248,5 +1311,1244 @@ cv.text(12, 110, "frame " + frame, 11, "#6B5560", false);
 
 Script.setWidget(widget);
 """.trimIndent(),
+        "🌀 日替わりマンダラ" to """
+// プリセット: 日替わりマンダラ（日付シードの万華鏡アート、ネット不要）
+// 対称に線と円を重ねるだけなのに、思いがけない模様が生まれる
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 7 + 3);
+const palette = ["#f78fb8", "#7cc7f0", "#ce9be8", "#ffab7a", "#facc15"];
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#171126");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌀 日替わりマンダラ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const S = 232, C = S / 2;
+const cv = widget.addCanvas(S, S);
+cv.rect(0, 0, S, S, "#171126");
+const petals = 6 + Math.floor(rnd() * 6); // 6〜11枚対称
+const layers = 3 + Math.floor(rnd() * 2);
+for (let l = 0; l < layers; l++) {
+  const rBase = 26 + l * 30 + rnd() * 10;
+  const col = palette[Math.floor(rnd() * palette.length)];
+  const dots = rnd() < 0.5;
+  for (let i = 0; i < petals; i++) {
+    const a = (Math.PI * 2 * i) / petals + l * 0.18;
+    const x = C + Math.cos(a) * rBase, y = C + Math.sin(a) * rBase;
+    if (dots) cv.circle(x, y, 5 + rnd() * 5, col);
+    else cv.ring(x, y, 7 + rnd() * 6, 2.2, 0, 360, col);
+    const x2 = C + Math.cos(a + 0.31) * (rBase + 13), y2 = C + Math.sin(a + 0.31) * (rBase + 13);
+    cv.line(x, y, x2, y2, col, 1.4);
+  }
+  cv.ring(C, C, rBase - 12, 1.2, 0, 360, col);
+}
+cv.circle(C, C, 9, palette[Math.floor(rnd() * palette.length)]);
+widget.addSpacer(6);
+const foot = widget.addText((now.getMonth() + 1) + "/" + now.getDate() + " の模様（毎日変わります）");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#9d8fc7");
+Script.setWidget(widget);
+""".trimIndent(),
+        "👾 日替わりドット絵" to """
+// プリセット: 日替わりドット絵（左右対称モンスター生成、ネット不要）
+// 12x12の左半分を乱数で決めて鏡写しにする、懐かしの生成テクニック
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 13 + 5);
+const bodies = ["#f78fb8", "#7cc7f0", "#ce9be8", "#ffab7a", "#86efac", "#facc15"];
+const body = bodies[Math.floor(rnd() * bodies.length)];
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#101828");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("👾 日替わりドット絵");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const N = 12, CELL = 15, OFF = (232 - N * CELL) / 2;
+const cv = widget.addCanvas(232, 190);
+cv.rect(0, 0, 232, 190, "#0b1220");
+const grid = [];
+for (let y = 0; y < N; y++) {
+  grid.push([]);
+  for (let x = 0; x < N / 2; x++) grid[y].push(rnd() < 0.42);
+}
+for (let y = 0; y < N; y++) {
+  for (let x = 0; x < N; x++) {
+    const on = x < N / 2 ? grid[y][x] : grid[y][N - 1 - x];
+    if (on) cv.rect(OFF + x * CELL + 1, 5 + y * CELL + 1, CELL - 2, CELL - 2, body);
+  }
+}
+// 目だけ白黒で入れると一気に「生き物」になる
+const ey = 3 + Math.floor(rnd() * 3);
+cv.rect(OFF + 3 * CELL + 4, 5 + ey * CELL + 4, 6, 6, "#101828");
+cv.rect(OFF + 8 * CELL + 4, 5 + ey * CELL + 4, 6, 6, "#101828");
+widget.addSpacer(6);
+const foot = widget.addText("今日のモンスター（明日は別の子）");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#8ea2c9");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌊 波のアート" to """
+// プリセット: 波のアート（サイン波の重ね描き、ネット不要）
+// 位相が時刻で流れるので、更新するたびに少し違う波になる
+const now = new Date();
+const phase = (now.getHours() * 60 + now.getMinutes()) / 22;
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0d1b2e");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌊 波のアート");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const W = 232, H = 150;
+const cv = widget.addCanvas(W, H);
+cv.rect(0, 0, W, H, "#0d1b2e");
+const cols = ["#7cc7f0", "#38bdf8", "#818cf8", "#f78fb8", "#ffab7a"];
+for (let w = 0; w < 5; w++) {
+  const amp = 12 + w * 7, base = 34 + w * 20, fr = 0.021 + w * 0.006;
+  let px = 0, py = base + Math.sin(phase + w) * amp;
+  for (let x = 4; x <= W - 4; x += 4) {
+    const y = base + Math.sin(x * fr + phase + w * 1.7) * amp;
+    cv.line(px, py, x, y, cols[w], 2.2);
+    px = x; py = y;
+  }
+}
+widget.addSpacer(6);
+const foot = widget.addText("更新するたび、波は流れています");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#7d94b8");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌳 フラクタルツリー" to """
+// プリセット: フラクタルツリー（再帰で枝分かれする木、ネット不要）
+// 枝の角度が日替わり。短い再帰で「計算で絵が生まれる」感覚を味わう
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 3 + 11);
+const spread = 0.32 + rnd() * 0.3;
+const lean = (rnd() - 0.5) * 0.14;
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#12211a");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌳 フラクタルツリー");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const W = 232, H = 185;
+const cv = widget.addCanvas(W, H);
+cv.rect(0, 0, W, H, "#0d1a13");
+cv.line(8, H - 6, W - 8, H - 6, "#2c4a3a", 2);
+function branch(x, y, angle, len, depth) {
+  if (depth === 0 || len < 3) {
+    cv.circle(x, y, 2.4, "#86efac");
+    return;
+  }
+  const nx = x + Math.sin(angle) * len, ny = y - Math.cos(angle) * len;
+  cv.line(x, y, nx, ny, depth > 5 ? "#a1805a" : "#c9a06a", depth > 5 ? 3 : 1.6);
+  branch(nx, ny, angle - spread + lean, len * 0.74, depth - 1);
+  branch(nx, ny, angle + spread + lean, len * 0.74, depth - 1);
+}
+branch(W / 2, H - 6, 0, 46, 8);
+widget.addSpacer(6);
+const foot = widget.addText("枝ぶりは日替わり（再帰の深さ 8）");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#7fae8f");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🪐 太陽系のいま" to """
+// プリセット: 太陽系のいま（惑星の位置を計算して描く、ネット不要）
+// 平均軌道要素からの近似計算。今日の惑星配置がそのまま絵になる
+const now = new Date();
+const days = (now.getTime() / 86400000) - 10957.5; // J2000.0 からの日数
+// [名前, 公転周期(日), 軌道半径の表示スケール, 色, 元期の平均黄経(度)]
+const planets = [
+  ["水星", 88, 26, "#d6c7b2", 252.3],
+  ["金星", 225, 40, "#facc15", 181.9],
+  ["地球", 365, 54, "#7cc7f0", 100.4],
+  ["火星", 687, 68, "#ff8a5c", 355.4],
+  ["木星", 4333, 84, "#e8b98a", 34.4],
+  ["土星", 10759, 100, "#e7d8a8", 49.9]
+];
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0a0f1e");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🪐 太陽系のいま");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const S = 232, C = S / 2;
+const cv = widget.addCanvas(S, S);
+cv.rect(0, 0, S, S, "#0a0f1e");
+// 背景の星
+for (let i = 0; i < 40; i++) {
+  const sx = (i * 53 + 17) % S, sy = (i * 91 + 29) % S;
+  cv.circle(sx, sy, i % 5 === 0 ? 1.6 : 1, "#3d4a6b");
+}
+cv.circle(C, C, 8, "#facc15");
+cv.ring(C, C, 11, 1.4, 0, 360, "#b45309");
+planets.forEach(function (p) {
+  const ang = ((p[4] + 360 * days / p[1]) % 360) * Math.PI / 180;
+  cv.ring(C, C, p[2], 0.7, 0, 360, "#26314d");
+  const x = C + Math.cos(ang) * p[2], y = C + Math.sin(ang) * p[2];
+  cv.circle(x, y, p[0] === "地球" ? 4.4 : 3.4, p[3]);
+});
+widget.addSpacer(6);
+const foot = widget.addText("今日の惑星配置（近似計算・上が北極側）");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#7d8db0");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🧩 日替わり迷路" to """
+// プリセット: 日替わり迷路（穴掘り法で生成、ネット不要）
+// スタート左上、ゴール右下。目で追って解く小さな迷路
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 17 + 23);
+
+const COLS = 11, ROWS = 9, CELL = 19;
+const W = COLS * CELL + 2, H = ROWS * CELL + 2;
+// walls[y][x] = [top, right, bottom, left]
+const walls = [], seen = [];
+for (let y = 0; y < ROWS; y++) {
+  walls.push([]); seen.push([]);
+  for (let x = 0; x < COLS; x++) { walls[y].push([1, 1, 1, 1]); seen[y].push(false); }
+}
+const stack = [[0, 0]];
+seen[0][0] = true;
+const dirs = [[0, -1, 0, 2], [1, 0, 1, 3], [0, 1, 2, 0], [-1, 0, 3, 1]];
+while (stack.length) {
+  const cur = stack[stack.length - 1];
+  const cx = cur[0], cy = cur[1];
+  const opts = [];
+  dirs.forEach(function (d) {
+    const nx = cx + d[0], ny = cy + d[1];
+    if (nx >= 0 && ny >= 0 && nx < COLS && ny < ROWS && !seen[ny][nx]) opts.push([nx, ny, d[2], d[3]]);
+  });
+  if (!opts.length) { stack.pop(); continue; }
+  const nxny = opts[Math.floor(rnd() * opts.length)];
+  walls[cy][cx][nxny[2]] = 0;
+  walls[nxny[1]][nxny[0]][nxny[3]] = 0;
+  seen[nxny[1]][nxny[0]] = true;
+  stack.push([nxny[0], nxny[1]]);
+}
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#191423");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🧩 日替わり迷路");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+const cv = widget.addCanvas(232, 190);
+cv.rect(0, 0, 232, 190, "#120e1c");
+const OX = (232 - W) / 2, OY = 6;
+cv.circle(OX + CELL / 2 + 1, OY + CELL / 2 + 1, 5, "#86efac");
+cv.circle(OX + (COLS - 1) * CELL + CELL / 2 + 1, OY + (ROWS - 1) * CELL + CELL / 2 + 1, 5, "#f78fb8");
+for (let y = 0; y < ROWS; y++) {
+  for (let x = 0; x < COLS; x++) {
+    const x0 = OX + x * CELL + 1, y0 = OY + y * CELL + 1, w = walls[y][x];
+    if (w[0]) cv.line(x0, y0, x0 + CELL, y0, "#8b7fb8", 2);
+    if (w[1]) cv.line(x0 + CELL, y0, x0 + CELL, y0 + CELL, "#8b7fb8", 2);
+    if (w[2]) cv.line(x0, y0 + CELL, x0 + CELL, y0 + CELL, "#8b7fb8", 2);
+    if (w[3]) cv.line(x0, y0, x0, y0 + CELL, "#8b7fb8", 2);
+  }
+}
+widget.addSpacer(6);
+const foot = widget.addText("緑からピンクへ。明日は新しい迷路");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#9d8fc7");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌌 今夜の星空" to """
+// プリセット: 今夜の星空（日替わりの星屑と星座もどき、ネット不要）
+// 星を散らして近い星同士を線で結ぶと、それっぽい星座が生まれる
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 19 + 31);
+
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0a1024");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌌 今夜の星空");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffffff");
+widget.addSpacer(8);
+
+const W = 232, H = 168;
+const cv = widget.addCanvas(W, H);
+cv.rect(0, 0, W, H, "#070d1f");
+for (let i = 0; i < 90; i++) {
+  cv.circle(rnd() * W, rnd() * H, rnd() < 0.12 ? 1.8 : 1, "#5b6f9e");
+}
+// 星座もどき：明るい星を6つ置いて順に結ぶ
+const stars = [];
+for (let i = 0; i < 6; i++) stars.push([24 + rnd() * (W - 48), 22 + rnd() * (H - 44)]);
+for (let i = 0; i < stars.length - 1; i++) {
+  cv.line(stars[i][0], stars[i][1], stars[i + 1][0], stars[i + 1][1], "#7cc7f0", 1.2);
+}
+stars.forEach(function (s) {
+  cv.circle(s[0], s[1], 3, "#ffffff");
+  cv.ring(s[0], s[1], 5.5, 1, 0, 360, "#7cc7f0");
+});
+// 月
+cv.circle(W - 30, 26, 10, "#fde68a");
+cv.circle(W - 26, 23, 8.5, "#070d1f");
+widget.addSpacer(6);
+const foot = widget.addText((now.getMonth() + 1) + "/" + now.getDate() + " の空（想像の星座つき）");
+foot.font = Font.systemFont(11);
+foot.textColor = new Color("#7d8db0");
+Script.setWidget(widget);
+""".trimIndent(),
+        "📜 今日は何の日" to """
+// プリセット: 今日は何の日（Wikipediaの「できごと」から1件、本物のデータ）
+// その日に起きた歴史の出来事を1つ。日付が変われば中身も変わる
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 53 + 3);
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#1d1a12");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("📜 今日は何の日");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#facc15");
+widget.addSpacer(8);
+const dateLine = widget.addText((now.getMonth() + 1) + "月" + now.getDate() + "日");
+dateLine.font = Font.boldSystemFont(20);
+dateLine.textColor = new Color("#ffffff");
+widget.addSpacer(6);
+try {
+  const pageTitle = encodeURIComponent((now.getMonth() + 1) + "月" + now.getDate() + "日");
+  const url = "https://ja.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&titles=" + pageTitle;
+  const res = await fetch(url);
+  const d = await res.json();
+  const pages = d.query.pages;
+  const key = Object.keys(pages)[0];
+  const text = pages[key].extract || "";
+  const start = text.indexOf("できごと");
+  if (start < 0) throw new Error("no section");
+  const sectionLines = [];
+  let pastHeader = false;
+  text.slice(start).split("\n").forEach(function (l) {
+    if (/==\s*$/.test(l)) { if (pastHeader) pastHeader = "done"; else pastHeader = true; return; }
+    if (pastHeader === true) sectionLines.push(l);
+  });
+  const lines = sectionLines.filter(function (l) { return /^\d{3,4}年/.test(l); });
+  if (!lines.length) throw new Error("empty");
+  const line = lines[Math.floor(rnd() * lines.length)];
+  const m = line.match(/^(\d{3,4}年)\s*-\s*(.*)$/);
+  const yr = widget.addText(m ? m[1] : "");
+  yr.font = Font.boldSystemFont(15);
+  yr.textColor = new Color("#facc15");
+  widget.addSpacer(2);
+  const body = m ? m[2] : line;
+  const tx = widget.addText(body.length > 90 ? body.slice(0, 90) + "…" : body);
+  tx.font = Font.systemFont(13);
+  tx.textColor = new Color("#e8e2d0");
+  widget.addSpacer(4);
+  const src = widget.addText("出典: Wikipedia「" + (now.getMonth() + 1) + "月" + now.getDate() + "日」");
+  src.font = Font.systemFont(10);
+  src.textColor = new Color("#8a8272");
+} catch (e) {
+  const err = widget.addText("歴史データを取得できませんでした（通信環境をご確認ください）");
+  err.font = Font.systemFont(12);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "☂️ 傘いる？" to """
+// プリセット: 傘いる？（東京の降水確率だけを超大きく、本物のデータ）
+// 天気ぜんぶは要らない。「傘を持つか」だけ知りたい朝のための単機能版
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0f2233");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("☂️ 傘いる？（東京）");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#7cc7f0");
+widget.addSpacer(10);
+try {
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=35.6762&longitude=139.6503&daily=precipitation_probability_max&timezone=Asia%2FTokyo";
+  const res = await fetch(url);
+  const d = await res.json();
+  const p = d.daily.precipitation_probability_max[0];
+  const big = widget.addText(p == null ? "—" : p + "%");
+  big.font = Font.boldSystemFont(44);
+  big.textColor = new Color("#ffffff");
+  widget.addSpacer(4);
+  const verdict = p == null ? "降水確率が分かりません"
+    : p >= 50 ? "傘、持っていきましょう"
+    : p >= 30 ? "折りたたみがあると安心"
+    : "傘はいらなそうです";
+  const v = widget.addText(verdict);
+  v.font = Font.boldSystemFont(16);
+  v.textColor = new Color(p != null && p >= 50 ? "#ffab7a" : "#86efac");
+  widget.addSpacer(4);
+  const sub = widget.addText("今日の降水確率（最大）");
+  sub.font = Font.systemFont(11);
+  sub.textColor = new Color("#7d94b8");
+} catch (e) {
+  const err = widget.addText("天気を取得できませんでした");
+  err.font = Font.systemFont(13);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "👕 洗濯指数" to """
+// プリセット: 洗濯指数（外干しできる？を天気から判定、本物のデータ）
+// 降水確率・気温・風から「干せる／微妙／部屋干し」を出す生活指数
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#10222b");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("👕 洗濯指数（東京）");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#7cc7f0");
+widget.addSpacer(10);
+try {
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=35.6762&longitude=139.6503&daily=precipitation_probability_max,temperature_2m_max,wind_speed_10m_max&timezone=Asia%2FTokyo";
+  const res = await fetch(url);
+  const d = await res.json();
+  const rain = d.daily.precipitation_probability_max[0] || 0;
+  const temp = d.daily.temperature_2m_max[0];
+  const wind = d.daily.wind_speed_10m_max[0];
+  let score = 100 - rain;
+  if (temp < 10) score -= 15;
+  if (wind >= 20) score -= 10;
+  if (wind < 5) score -= 5;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const big = widget.addText(score + "");
+  big.font = Font.boldSystemFont(44);
+  big.textColor = new Color("#ffffff");
+  widget.addSpacer(2);
+  const verdict = score >= 70 ? "外干し日和です" : score >= 40 ? "干せるけど様子見で" : "今日は部屋干しが無難";
+  const v = widget.addText(verdict);
+  v.font = Font.boldSystemFont(16);
+  v.textColor = new Color(score >= 70 ? "#86efac" : score >= 40 ? "#facc15" : "#ffab7a");
+  widget.addSpacer(4);
+  const sub = widget.addText("降水 " + rain + "%・最高 " + Math.round(temp) + "℃・風 " + Math.round(wind) + "km/h");
+  sub.font = Font.systemFont(11);
+  sub.textColor = new Color("#7d94b8");
+} catch (e) {
+  const err = widget.addText("天気を取得できませんでした");
+  err.font = Font.systemFont(13);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "🧴 UV指数" to """
+// プリセット: UV指数（今日の紫外線の強さ、本物のデータ）
+// 数値と対策をひとこと。日焼け止めを塗るかどうかの判断材料に
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#2b1a10");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🧴 UV指数（東京）");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffab7a");
+widget.addSpacer(10);
+try {
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=35.6762&longitude=139.6503&daily=uv_index_max&timezone=Asia%2FTokyo";
+  const res = await fetch(url);
+  const d = await res.json();
+  const uv = d.daily.uv_index_max[0];
+  const big = widget.addText(uv == null ? "—" : uv.toFixed(1));
+  big.font = Font.boldSystemFont(44);
+  big.textColor = new Color("#ffffff");
+  widget.addSpacer(4);
+  let level, advice, col;
+  if (uv == null) { level = "不明"; advice = "データが取れませんでした"; col = "#9ca3af"; }
+  else if (uv < 3) { level = "弱い"; advice = "対策は最小限でOK"; col = "#86efac"; }
+  else if (uv < 6) { level = "中くらい"; advice = "日焼け止めを塗ると安心"; col = "#facc15"; }
+  else if (uv < 8) { level = "強い"; advice = "日焼け止め＋帽子がおすすめ"; col = "#ffab7a"; }
+  else { level = "非常に強い"; advice = "昼間の外出は最小限に"; col = "#f87171"; }
+  const v = widget.addText(level);
+  v.font = Font.boldSystemFont(16);
+  v.textColor = new Color(col);
+  widget.addSpacer(2);
+  const a = widget.addText(advice);
+  a.font = Font.systemFont(12);
+  a.textColor = new Color("#d8cfc2");
+} catch (e) {
+  const err = widget.addText("UVデータを取得できませんでした");
+  err.font = Font.systemFont(13);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌅 日の出・日の入り" to """
+// プリセット: 日の出・日の入り（東京、本物のデータ）
+// 朝ランや写真の計画に。日の長さも一緒に出す
+function hm(iso) { return iso.slice(11, 16); }
+function toMin(iso) { return Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16)); }
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#241a2e");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌅 日の出・日の入り（東京）");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ce9be8");
+widget.addSpacer(10);
+try {
+  const url = "https://api.open-meteo.com/v1/forecast?latitude=35.6762&longitude=139.6503&daily=sunrise,sunset&timezone=Asia%2FTokyo";
+  const res = await fetch(url);
+  const d = await res.json();
+  const rise = d.daily.sunrise[0], set = d.daily.sunset[0];
+  const row = widget.addStack();
+  row.layoutHorizontally();
+  const c1 = row.addStack();
+  const l1 = c1.addText("日の出");
+  l1.font = Font.systemFont(12);
+  l1.textColor = new Color("#9d8fc7");
+  const t1 = c1.addText(hm(rise));
+  t1.font = Font.boldSystemFont(30);
+  t1.textColor = new Color("#facc15");
+  row.addSpacer();
+  const c2 = row.addStack();
+  const l2 = c2.addText("日の入り");
+  l2.font = Font.systemFont(12);
+  l2.textColor = new Color("#9d8fc7");
+  const t2 = c2.addText(hm(set));
+  t2.font = Font.boldSystemFont(30);
+  t2.textColor = new Color("#ffab7a");
+  widget.addSpacer(8);
+  const len = toMin(set) - toMin(rise);
+  const sub = widget.addText("日の長さ " + Math.floor(len / 60) + "時間" + (len % 60) + "分");
+  sub.font = Font.systemFont(12);
+  sub.textColor = new Color("#d8cfc2");
+} catch (e) {
+  const err = widget.addText("太陽データを取得できませんでした");
+  err.font = Font.systemFont(13);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "💱 為替レート" to """
+// プリセット: 為替レート（ドル・ユーロ・ポンドの対円、本物のデータ）
+// チャート版（fx-chart）の簡易版。数字だけを大きく、すぐ見たい人向け
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0f2417");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("💱 為替レート");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#86efac");
+widget.addSpacer(10);
+try {
+  const res = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=JPY,EUR,GBP");
+  const d = await res.json();
+  const jpy = d.rates.JPY, eur = d.rates.EUR, gbp = d.rates.GBP;
+  const rows = [
+    ["🇺🇸 ドル", jpy],
+    ["🇪🇺 ユーロ", jpy / eur],
+    ["🇬🇧 ポンド", jpy / gbp]
+  ];
+  rows.forEach(function (r, i) {
+    if (i > 0) widget.addSpacer(6);
+    const row = widget.addStack();
+    row.layoutHorizontally();
+    row.alignItems = "center";
+    const name = row.addText(r[0]);
+    name.font = Font.systemFont(14);
+    name.textColor = new Color("#d8e8d8");
+    row.addSpacer();
+    const val = row.addText("¥" + r[1].toFixed(1));
+    val.font = Font.boldSystemFont(22);
+    val.textColor = new Color("#ffffff");
+  });
+  widget.addSpacer(8);
+  const sub = widget.addText("基準日 " + d.date + "（欧州中央銀行の参照レート）");
+  sub.font = Font.systemFont(11);
+  sub.textColor = new Color("#7fae8f");
+} catch (e) {
+  const err = widget.addText("レートを取得できませんでした");
+  err.font = Font.systemFont(13);
+  err.textColor = new Color("#ffab7a");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "🗑 今日のゴミ" to """
+// プリセット: ゴミの日（曜日で判定、ネット不要）
+// ↓のルールを自分の地域に書き換えて使う想定のテンプレ。
+// 0=日 1=月 2=火 3=水 4=木 5=金 6=土 ／「」内は表示名
+const RULES = {
+  1: "燃えるゴミ", 4: "燃えるゴミ",
+  2: "資源ゴミ（缶・びん・ペット）",
+  3: "燃えないゴミ",
+  5: "プラスチック",
+  6: "古紙・ダンボール",
+  0: "収集なし"
+};
+const WD = ["日", "月", "火", "水", "木", "金", "土"];
+const now = new Date();
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#14231d");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🗑 今日のゴミ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#86efac");
+widget.addSpacer(10);
+const today = RULES[now.getDay()];
+const big = widget.addText(today);
+big.font = Font.boldSystemFont(today.length > 8 ? 20 : 26);
+big.textColor = new Color("#ffffff");
+widget.addSpacer(6);
+const tmr = new Date(now.getTime() + 86400000);
+const sub = widget.addText("明日（" + WD[tmr.getDay()] + "）は " + RULES[tmr.getDay()]);
+sub.font = Font.systemFont(13);
+sub.textColor = new Color("#a7c4b5");
+widget.addSpacer(4);
+const note = widget.addText("※ ルールはコード内の RULES を書き換えてください");
+note.font = Font.systemFont(11);
+note.textColor = new Color("#5f7a6a");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🎌 次の祝日" to """
+// プリセット: 次の祝日（2026〜2027年の日本の祝日入り、ネット不要）
+// 「あと何日がんばれば休みか」を数える、小さな希望の表示
+const HOLIDAYS = [
+  ["2026-01-01", "元日"], ["2026-01-12", "成人の日"], ["2026-02-11", "建国記念の日"],
+  ["2026-02-23", "天皇誕生日"], ["2026-03-20", "春分の日"], ["2026-04-29", "昭和の日"],
+  ["2026-05-03", "憲法記念日"], ["2026-05-04", "みどりの日"], ["2026-05-05", "こどもの日"],
+  ["2026-05-06", "振替休日"], ["2026-07-20", "海の日"], ["2026-08-11", "山の日"],
+  ["2026-09-21", "敬老の日"], ["2026-09-22", "国民の休日"], ["2026-09-23", "秋分の日"],
+  ["2026-10-12", "スポーツの日"], ["2026-11-03", "文化の日"], ["2026-11-23", "勤労感謝の日"],
+  ["2027-01-01", "元日"], ["2027-01-11", "成人の日"], ["2027-02-11", "建国記念の日"],
+  ["2027-02-23", "天皇誕生日"], ["2027-03-20", "春分の日"], ["2027-04-29", "昭和の日"],
+  ["2027-05-03", "憲法記念日"], ["2027-05-04", "みどりの日"], ["2027-05-05", "こどもの日"],
+  ["2027-07-19", "海の日"], ["2027-08-11", "山の日"], ["2027-09-20", "敬老の日"],
+  ["2027-09-23", "秋分の日"], ["2027-10-11", "スポーツの日"], ["2027-11-03", "文化の日"],
+  ["2027-11-23", "勤労感謝の日"]
+];
+function dayDiff(a, b) {
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((db - da) / 86400000);
+}
+const now = new Date();
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#2b1420");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🎌 次の祝日");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#f78fb8");
+widget.addSpacer(10);
+let found = null;
+for (let i = 0; i < HOLIDAYS.length; i++) {
+  const parts = HOLIDAYS[i][0].split("-");
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (dayDiff(now, d) >= 0) { found = [d, HOLIDAYS[i][1], dayDiff(now, d)]; break; }
+}
+if (found) {
+  const name = widget.addText(found[1]);
+  name.font = Font.boldSystemFont(24);
+  name.textColor = new Color("#ffffff");
+  widget.addSpacer(4);
+  const WD = ["日", "月", "火", "水", "木", "金", "土"];
+  const when = (found[0].getMonth() + 1) + "月" + found[0].getDate() + "日（" + WD[found[0].getDay()] + "）";
+  const line = found[2] === 0 ? "今日です！ お休みを満喫しましょう" : when + " ・ あと " + found[2] + " 日";
+  const sub = widget.addText(line);
+  sub.font = Font.systemFont(14);
+  sub.textColor = new Color(found[2] === 0 ? "#facc15" : "#d8cfc2");
+} else {
+  const end = widget.addText("収録分の祝日は終わりました");
+  end.font = Font.systemFont(14);
+  end.textColor = new Color("#d8cfc2");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "🎂 誕生日カウント" to """
+// プリセット: 誕生日カウント（大切な日まであと何日、ネット不要）
+// ↓の名前と月日を書き換えて使う想定のテンプレ
+const WHO = "大切な人";
+const MONTH = 4, DAY = 29; // 例: 4月29日
+function dayDiff(a, b) {
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((db - da) / 86400000);
+}
+const now = new Date();
+let target = new Date(now.getFullYear(), MONTH - 1, DAY);
+if (dayDiff(now, target) < 0) target = new Date(now.getFullYear() + 1, MONTH - 1, DAY);
+const left = dayDiff(now, target);
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#2b1428");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🎂 " + WHO + "の誕生日");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#f78fb8");
+widget.addSpacer(10);
+if (left === 0) {
+  const big = widget.addText("今日です！🎉");
+  big.font = Font.boldSystemFont(30);
+  big.textColor = new Color("#facc15");
+} else {
+  const row = widget.addStack();
+  row.layoutHorizontally();
+  row.alignItems = "center";
+  const a = row.addText("あと ");
+  a.font = Font.systemFont(16);
+  a.textColor = new Color("#d8cfc2");
+  const n = row.addText("" + left);
+  n.font = Font.boldSystemFont(40);
+  n.textColor = new Color("#ffffff");
+  const b = row.addText(" 日");
+  b.font = Font.systemFont(16);
+  b.textColor = new Color("#d8cfc2");
+}
+widget.addSpacer(4);
+const sub = widget.addText((target.getMonth() + 1) + "月" + target.getDate() + "日");
+sub.font = Font.systemFont(12);
+sub.textColor = new Color("#9d8fc7");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🐷 貯金メーター" to """
+// プリセット: 貯金メーター（目標までの進み具合、ネット不要）
+// ↓の3つを書き換えて使う想定のテンプレ。貯まったら NOW を更新するだけ
+const LABEL = "旅行資金";
+const GOAL = 300000;
+const NOW = 126000;
+function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+const pct = Math.min(1, NOW / GOAL);
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#12262e");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🐷 貯金メーター");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#7cc7f0");
+widget.addSpacer(10);
+const name = widget.addText(LABEL);
+name.font = Font.boldSystemFont(18);
+name.textColor = new Color("#ffffff");
+widget.addSpacer(6);
+const holder = widget.addStack();
+holder.addProgress(pct, new Color("#f78fb8"), new Color("#2c4350"));
+widget.addSpacer(6);
+const line = widget.addText("¥" + fmt(NOW) + " / ¥" + fmt(GOAL) + "（" + Math.floor(pct * 100) + "%）");
+line.font = Font.systemFont(13);
+line.textColor = new Color("#d8e8e8");
+widget.addSpacer(2);
+const left = widget.addText("ゴールまで あと ¥" + fmt(GOAL - NOW));
+left.font = Font.systemFont(12);
+left.textColor = new Color("#7d94b8");
+Script.setWidget(widget);
+""".trimIndent(),
+        "💧 水分チャージ" to """
+// プリセット: 水分チャージ（時刻から今日の水分の目安、ネット不要）
+// 1日2Lを目安に、起きている時間で割った「いま何杯目くらいか」の目安
+const now = new Date();
+const h = now.getHours() + now.getMinutes() / 60;
+const GOAL_CUPS = 8; // コップ8杯 ≒ 2L
+let target = 0;
+if (h >= 7 && h < 23) target = Math.min(GOAL_CUPS, Math.floor((h - 7) / 2) + 1);
+else if (h >= 23) target = GOAL_CUPS;
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0e2436");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("💧 水分チャージ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#7cc7f0");
+widget.addSpacer(10);
+let cups = "";
+for (let i = 0; i < GOAL_CUPS; i++) cups += i < target ? "🟦" : "⬜";
+const row = widget.addText(cups);
+row.font = Font.systemFont(17);
+widget.addSpacer(6);
+const msg = h < 7 ? "おはようございます。朝の一杯から"
+  : target >= GOAL_CUPS ? "今日の目安は達成ペースです"
+  : "いま " + target + " 杯目のタイミングです";
+const m = widget.addText(msg);
+m.font = Font.boldSystemFont(15);
+m.textColor = new Color("#ffffff");
+widget.addSpacer(4);
+const sub = widget.addText("目安: 1日コップ8杯（約2L）。のどが渇く前に少しずつ");
+sub.font = Font.systemFont(11);
+sub.textColor = new Color("#7d94b8");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🎋 毎日おみくじ" to """
+// プリセット: 毎日おみくじ（日替わり運勢、ネット不要）
+// 日付シードなので、その日は何度見ても同じ結果（引き直しは明日）
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 29 + 7);
+const FORTUNES = ["大吉", "中吉", "小吉", "吉", "末吉", "凶"];
+const WEIGHTS = [12, 22, 24, 22, 14, 6];
+const ITEMS = ["温かい飲み物", "青いハンカチ", "新しい靴下", "文房具", "観葉植物", "白いマグカップ", "イヤホン", "付箋", "ラムネ", "木のスプーン"];
+const WORDS = ["思い切って先に謝ると丸く収まる日", "探し物は足元にあり", "いつもより一駅歩くと良いことあり", "温かい汁物が運を運ぶ", "後回しの1件を片付けると軽くなる", "笑顔の挨拶が効く日", "新しい道を通ると発見あり"];
+let roll = rnd() * 100, acc = 0, fortune = "吉";
+for (let i = 0; i < FORTUNES.length; i++) { acc += WEIGHTS[i]; if (roll < acc) { fortune = FORTUNES[i]; break; } }
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#26161f");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🎋 毎日おみくじ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#f78fb8");
+widget.addSpacer(8);
+const big = widget.addText(fortune);
+big.font = Font.boldSystemFont(40);
+big.textColor = new Color(fortune === "大吉" ? "#facc15" : fortune === "凶" ? "#9ca3af" : "#ffffff");
+widget.addSpacer(6);
+const w = widget.addText(WORDS[Math.floor(rnd() * WORDS.length)]);
+w.font = Font.systemFont(13);
+w.textColor = new Color("#e8d8e2");
+widget.addSpacer(4);
+const item = widget.addText("ラッキーアイテム: " + ITEMS[Math.floor(rnd() * ITEMS.length)]);
+item.font = Font.systemFont(12);
+item.textColor = new Color("#9d8fc7");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🎰 デイリーガチャ" to """
+// プリセット: デイリーガチャ（1日1回気分のレア引き、ネット不要）
+// 日替わり固定。星の数とアイテム名で小さく盛り上がる
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 31 + 13);
+const roll = rnd() * 100;
+let stars, pool, col;
+if (roll < 3) { stars = 5; col = "#facc15"; pool = ["伝説の剣（気分）", "虹色の羽根", "時の砂時計"]; }
+else if (roll < 15) { stars = 4; col = "#ce9be8"; pool = ["魔法のコンパス", "星屑のペンダント", "賢者の石ころ"]; }
+else if (roll < 45) { stars = 3; col = "#7cc7f0"; pool = ["鉄の盾", "回復ポーション", "革のブーツ", "銀の鍵"]; }
+else { stars = 2; col = "#9ca3af"; pool = ["木の棒", "布の帽子", "石ころ", "ひも", "空き缶"]; }
+const item = pool[Math.floor(rnd() * pool.length)];
+let starStr = "";
+for (let i = 0; i < 5; i++) starStr += i < stars ? "★" : "☆";
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#1a1430");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🎰 デイリーガチャ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ce9be8");
+widget.addSpacer(10);
+const s = widget.addText(starStr);
+s.font = Font.boldSystemFont(26);
+s.textColor = new Color(col);
+widget.addSpacer(4);
+const name = widget.addText(item);
+name.font = Font.boldSystemFont(20);
+name.textColor = new Color("#ffffff");
+widget.addSpacer(4);
+const sub = widget.addText(stars >= 4 ? "今日はついてる日かも" : "また明日、引き直せます");
+sub.font = Font.systemFont(12);
+sub.textColor = new Color("#9d8fc7");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🗡 レベル表示" to """
+// プリセット: レベル表示（今年の経過日数＝レベル、ネット不要）
+// 1日生きるごとにレベルが上がる。経験値バーは今年の進み具合
+const now = new Date();
+const start = new Date(now.getFullYear(), 0, 1);
+const end = new Date(now.getFullYear() + 1, 0, 1);
+const dayOfYear = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - start) / 86400000) + 1;
+const yearDays = Math.round((end - start) / 86400000);
+const titles = ["駆け出し", "見習い", "一人前", "ベテラン", "達人", "賢者", "英雄", "伝説"];
+const titleName = titles[Math.min(titles.length - 1, Math.floor(dayOfYear / 46))];
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#141c2e");
+widget.setPadding(14, 14, 14, 14);
+const t = widget.addText("🗡 あなたのレベル");
+t.font = Font.boldSystemFont(14);
+t.textColor = new Color("#7cc7f0");
+widget.addSpacer(8);
+const row = widget.addStack();
+row.layoutHorizontally();
+row.alignItems = "center";
+const lv = row.addText("Lv." + dayOfYear);
+lv.font = Font.boldSystemFont(36);
+lv.textColor = new Color("#ffffff");
+row.addSpacer(10);
+const tt = row.addText("称号: " + titleName);
+tt.font = Font.boldSystemFont(15);
+tt.textColor = new Color("#facc15");
+widget.addSpacer(8);
+const holder = widget.addStack();
+holder.addProgress(dayOfYear / yearDays, new Color("#7cc7f0"), new Color("#2c3a55"));
+widget.addSpacer(4);
+const sub = widget.addText("次のレベルまで あと1日（寝れば上がります）");
+sub.font = Font.systemFont(12);
+sub.textColor = new Color("#8ea2c9");
+Script.setWidget(widget);
+""".trimIndent(),
+        "👹 週末ボス" to """
+// プリセット: 週末ボス（週末までの距離をボス戦っぽく、ネット不要）
+// 平日はボスのHPが減っていく。土日は「討伐完了」
+const now = new Date();
+const day = now.getDay(); // 0=日 1=月 ... 6=土
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#2b1215");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("👹 週末ボス");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#f87171");
+widget.addSpacer(10);
+if (day === 0 || day === 6) {
+  const big = widget.addText("討伐完了！🏆");
+  big.font = Font.boldSystemFont(28);
+  big.textColor = new Color("#facc15");
+  widget.addSpacer(4);
+  const sub = widget.addText("今日は週末です。回復に専念しましょう");
+  sub.font = Font.systemFont(13);
+  sub.textColor = new Color("#e8d8d8");
+} else {
+  const hpLeft = (5 - day) / 4; // 金曜の終わりで0に近づく
+  const big = widget.addText("ボスまで あと " + (6 - day) + " 日");
+  big.font = Font.boldSystemFont(24);
+  big.textColor = new Color("#ffffff");
+  widget.addSpacer(8);
+  const label = widget.addText("平日ボスのHP");
+  label.font = Font.systemFont(11);
+  label.textColor = new Color("#c9a0a0");
+  widget.addSpacer(2);
+  const holder = widget.addStack();
+  holder.addProgress(Math.max(0.05, hpLeft), new Color("#f87171"), new Color("#4a2c2c"));
+  widget.addSpacer(4);
+  const sub = widget.addText(day === 5 ? "あと少し！ 今日を越えれば勝ちです" : "一歩ずつ削っていきましょう");
+  sub.font = Font.systemFont(12);
+  sub.textColor = new Color("#d8cfc2");
+}
+Script.setWidget(widget);
+""".trimIndent(),
+        "🍜 ランチ占い" to """
+// プリセット: ランチ占い（今日のランチを日替わりで決定、ネット不要）
+// 迷う時間を消す係。決められたら、あとは従うだけ
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 37 + 17);
+const MENU = [
+  ["🍜", "ラーメン", "今日は麺の日。替え玉は自由"],
+  ["🍛", "カレー", "スパイスで午後を乗り切る"],
+  ["🍣", "寿司", "ちょっと贅沢にいく日"],
+  ["🍔", "ハンバーガー", "がっつりいくなら今日"],
+  ["🍝", "パスタ", "迷ったらトマト系"],
+  ["🍱", "定食", "バランスよく、が正解の日"],
+  ["🥗", "サラダ＋スープ", "軽めにして午後の眠気を回避"],
+  ["🍙", "おにぎり", "軽く済ませて時間を買う日"],
+  ["🍤", "天ぷら", "揚げたての音を聞きにいく"],
+  ["🥪", "サンドイッチ", "片手で食べられる余裕を"],
+  ["🍲", "鍋焼きうどん", "温かいもので整える日"],
+  ["🌮", "タコス", "いつもと違う味に挑戦"]
+];
+const pick = MENU[Math.floor(rnd() * MENU.length)];
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#2b1d10");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🍽 ランチ占い");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ffab7a");
+widget.addSpacer(10);
+const big = widget.addText(pick[0] + " " + pick[1]);
+big.font = Font.boldSystemFont(28);
+big.textColor = new Color("#ffffff");
+widget.addSpacer(4);
+const sub = widget.addText(pick[2]);
+sub.font = Font.systemFont(13);
+sub.textColor = new Color("#e8dcc8");
+widget.addSpacer(4);
+const note = widget.addText("今日の分は決定済みです（占い）");
+note.font = Font.systemFont(11);
+note.textColor = new Color("#a08b6d");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🔮 今日イチ星座" to """
+// プリセット: 今日イチ星座（12星座から日替わりで1位を発表、ネット不要）
+// 自分の星座じゃなくても、1位の星座のラッキーカラーを借りる楽しみ方も
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 41 + 19);
+const SIGNS = ["牡羊座", "牡牛座", "双子座", "蟹座", "獅子座", "乙女座", "天秤座", "蠍座", "射手座", "山羊座", "水瓶座", "魚座"];
+const COLORS = ["赤", "青", "黄色", "緑", "ピンク", "紫", "白", "黒", "金", "銀", "オレンジ", "水色"];
+const ACTIONS = ["朝の散歩", "本を1ページ読む", "温かいお茶", "机の片付け", "早めの就寝", "ストレッチ", "手書きメモ", "深呼吸3回"];
+const winner = SIGNS[Math.floor(rnd() * SIGNS.length)];
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#161a30");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🔮 今日イチの星座");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#ce9be8");
+widget.addSpacer(10);
+const big = widget.addText("✨ " + winner);
+big.font = Font.boldSystemFont(30);
+big.textColor = new Color("#ffffff");
+widget.addSpacer(6);
+const c = widget.addText("ラッキーカラー: " + COLORS[Math.floor(rnd() * COLORS.length)]);
+c.font = Font.systemFont(13);
+c.textColor = new Color("#e8e2f2");
+widget.addSpacer(2);
+const a = widget.addText("ラッキーアクション: " + ACTIONS[Math.floor(rnd() * ACTIONS.length)]);
+a.font = Font.systemFont(13);
+a.textColor = new Color("#e8e2f2");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🕐 でか時計" to """
+// プリセット: でか時計（時刻を超大きく、ネット不要）
+// 更新時点の時刻を表示する、最もシンプルな時計
+function pad2(n) { return String(n).padStart(2, "0"); }
+const WD = ["日", "月", "火", "水", "木", "金", "土"];
+const now = new Date();
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#101418");
+widget.setPadding(14, 14, 14, 14);
+const time = widget.addText(pad2(now.getHours()) + ":" + pad2(now.getMinutes()));
+time.font = Font.boldSystemFont(52);
+time.textColor = new Color("#ffffff");
+widget.addSpacer(4);
+const date = widget.addText((now.getMonth() + 1) + "月" + now.getDate() + "日（" + WD[now.getDay()] + "）");
+date.font = Font.systemFont(15);
+date.textColor = new Color("#9ca3af");
+Script.setWidget(widget);
+""".trimIndent(),
+        "📅 今日の日付" to """
+// プリセット: 今日の日付（月日と曜日だけを超大きく、ネット不要）
+// 「今日何日だっけ」専用。これ以上は削れないシンプルさ
+const WD = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+const now = new Date();
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#14181f");
+widget.setPadding(14, 14, 14, 14);
+const big = widget.addText((now.getMonth() + 1) + "月" + now.getDate() + "日");
+big.font = Font.boldSystemFont(40);
+big.textColor = new Color("#ffffff");
+widget.addSpacer(4);
+const wd = widget.addText(WD[now.getDay()]);
+wd.font = Font.boldSystemFont(18);
+wd.textColor = new Color(now.getDay() === 0 ? "#f87171" : now.getDay() === 6 ? "#7cc7f0" : "#9ca3af");
+widget.addSpacer(4);
+const yr = widget.addText(now.getFullYear() + "年");
+yr.font = Font.systemFont(12);
+yr.textColor = new Color("#6b7280");
+Script.setWidget(widget);
+""".trimIndent(),
+        "📆 今週のマス" to """
+// プリセット: 今週のマス（月〜日の7マス、ネット不要）
+// 過ぎた日は塗られ、今日は光る。今週のどこにいるか一目で
+const WD = ["月", "火", "水", "木", "金", "土", "日"];
+const now = new Date();
+const todayIdx = (now.getDay() + 6) % 7; // 月曜=0
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#141c26");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("📆 今週の進み具合");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#7cc7f0");
+widget.addSpacer(12);
+const row = widget.addStack();
+row.layoutHorizontally();
+WD.forEach(function (w, i) {
+  if (i > 0) row.addSpacer(6);
+  const cell = row.addStack();
+  cell.cornerRadius = 10;
+  cell.setPadding(8, 10, 8, 10);
+  cell.backgroundColor = new Color(i < todayIdx ? "#2c4a6b" : i === todayIdx ? "#f78fb8" : "#22303f");
+  const t = cell.addText(w);
+  t.font = Font.boldSystemFont(15);
+  t.textColor = new Color(i === todayIdx ? "#1a0d14" : "#ffffff");
+  t.align = "center";
+});
+widget.addSpacer(8);
+const sub = widget.addText("今日は " + WD[todayIdx] + "曜日 ・ 今週 " + (todayIdx + 1) + " 日目");
+sub.font = Font.systemFont(12);
+sub.textColor = new Color("#8ea2c9");
+Script.setWidget(widget);
+""".trimIndent(),
+        "📝 今日の一言" to """
+// プリセット: 今日の一言（日替わりの短い言葉、ネット不要）
+// 朝に目に入る、短くてやさしい一文だけ
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let x = Math.imul(a ^ a >>> 15, 1 | a);
+    x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const now = new Date();
+const seedNum = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+const rnd = mulberry32(seedNum * 43 + 29);
+const WORDS = [
+  "今日は、ほどほどで十分",
+  "休むのも仕事のうち",
+  "小さく始めて、早く終わる",
+  "深呼吸ひとつで、仕切り直し",
+  "比べる相手は昨日の自分",
+  "完璧より、完了",
+  "温かいものを飲もう",
+  "散歩は最強のリセット",
+  "やらないことを決める日",
+  "好きなものから手をつける",
+  "返事は明日でも大丈夫",
+  "空を見る余裕を",
+  "今日の分は、今日の分だけ",
+  "うまくいかない日も、進んでいる"
+];
+const pick = WORDS[Math.floor(rnd() * WORDS.length)];
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#1c1a26");
+widget.setPadding(16, 16, 16, 16);
+const title = widget.addText("📝 今日の一言");
+title.font = Font.boldSystemFont(13);
+title.textColor = new Color("#ce9be8");
+widget.addSpacer(10);
+const big = widget.addText(pick);
+big.font = Font.boldSystemFont(19);
+big.textColor = new Color("#ffffff");
+widget.addSpacer(6);
+const sub = widget.addText((now.getMonth() + 1) + "/" + now.getDate() + " の言葉（毎日変わります）");
+sub.font = Font.systemFont(11);
+sub.textColor = new Color("#8f88a8");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌿 深呼吸" to """
+// プリセット: 深呼吸（円を見ながら呼吸を整える、ネット不要）
+// 更新した瞬間の秒で円の大きさが決まる。4秒吸って、4秒吐く目安
+const now = new Date();
+const cycle = (now.getSeconds() % 8) / 8; // 8秒サイクル
+const inhale = cycle < 0.5;
+const t = inhale ? cycle * 2 : (cycle - 0.5) * 2;
+const scale = inhale ? 0.45 + t * 0.55 : 1 - t * 0.55;
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#0f2027");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌿 深呼吸");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#86efac");
+widget.addSpacer(8);
+const S = 150, C = S / 2;
+const cv = widget.addCanvas(S, S);
+cv.rect(0, 0, S, S, "#0f2027");
+cv.ring(C, C, 66, 1.2, 0, 360, "#2c4a4a");
+cv.circle(C, C, 60 * scale, inhale ? "#5ec8a8" : "#3d8fa8");
+cv.circle(C, C, 60 * scale * 0.55, inhale ? "#8fe3c3" : "#67b8cc");
+widget.addSpacer(6);
+const label = widget.addText(inhale ? "吸って…" : "吐いて…");
+label.font = Font.boldSystemFont(16);
+label.textColor = new Color("#ffffff");
+const sub = widget.addText("円に合わせて、ゆっくり4秒ずつ");
+sub.font = Font.systemFont(11);
+sub.textColor = new Color("#7fae8f");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🌱 人生カウンタ" to """
+// プリセット: 人生○日目（生まれてから何日目か、ネット不要）
+// ↓の誕生日を自分のものに書き換えて使う想定のテンプレ
+const BIRTH = "1998-11-11"; // 例: 1998年11月11日
+function dayDiff(a, b) {
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((db - da) / 86400000);
+}
+const parts = BIRTH.split("-");
+const birth = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+const now = new Date();
+const days = dayDiff(birth, now) + 1;
+const widget = new ListWidget();
+widget.backgroundColor = new Color("#16241a");
+widget.setPadding(14, 14, 14, 14);
+const title = widget.addText("🌱 人生カウンタ");
+title.font = Font.boldSystemFont(14);
+title.textColor = new Color("#86efac");
+widget.addSpacer(10);
+const row = widget.addStack();
+row.layoutHorizontally();
+row.alignItems = "center";
+const pre = row.addText("今日は ");
+pre.font = Font.systemFont(15);
+pre.textColor = new Color("#d8e8d8");
+const n = row.addText(String(days).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+n.font = Font.boldSystemFont(34);
+n.textColor = new Color("#ffffff");
+const post = row.addText(" 日目");
+post.font = Font.systemFont(15);
+post.textColor = new Color("#d8e8d8");
+widget.addSpacer(4);
+const sub = widget.addText("1日1日が、ちゃんと積み上がっています");
+sub.font = Font.systemFont(12);
+sub.textColor = new Color("#7fae8f");
+Script.setWidget(widget);
+""".trimIndent()
     )
 }
