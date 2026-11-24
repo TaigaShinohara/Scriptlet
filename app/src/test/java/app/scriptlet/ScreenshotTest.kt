@@ -111,6 +111,24 @@ class ScreenshotTest {
     }
 
     @Test
+    fun feedScreen_presetCards() {
+        val store = seededStore()
+        paparazzi.snapshot {
+            ScriptletTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    app.scriptlet.ui.FeedScreen(
+                        store = store,
+                        engine = ScriptEngine(store),
+                        onBack = {},
+                        onOpenScript = {},
+                        autoRun = false,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun editorScreen_weatherTemplateLoaded() {
         val store = seededStore()
         val weather = store.scripts.value.firstOrNull { it.name.contains("天気") }

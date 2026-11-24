@@ -29,8 +29,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "0.21.0-animproto"
+        versionCode = 38
+        versionName = "0.22.0-feed"
     }
 
     signingConfigs {

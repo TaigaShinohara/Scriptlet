@@ -217,6 +217,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
     var editingId by remember { mutableStateOf<String?>(null) }
     var createSeed by remember { mutableStateOf<Triple<String, String, String>?>(null) }
     var showHelp by remember { mutableStateOf(false) }
+    var showFeed by remember { mutableStateOf(false) }
     // Manual replay from the help screen: same onboarding, but leaving it
     // returns to the list and the recorded version is left untouched.
     var replayOnboarding by remember { mutableStateOf(false) }
@@ -234,6 +235,15 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
                 prefs.edit().putInt("onboarding_version", 3).apply()
                 onboardingDone = true
                 replayOnboarding = false
+            },
+        )
+        showFeed -> app.scriptlet.ui.FeedScreen(
+            store = store,
+            engine = engine,
+            onBack = { showFeed = false },
+            onOpenScript = { id ->
+                showFeed = false
+                editingId = id
             },
         )
         showHelp -> HelpScreen(
@@ -273,6 +283,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
             onOpen = { editingId = it },
             onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
             onHelp = { showHelp = true },
+            onFeed = { showFeed = true },
         )
     }
 }
@@ -281,7 +292,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
 @Composable
 // internal (not private) so the JVM screenshot tests in this module can
 // render the real screen; no behaviour change.
-internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
+internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit, onFeed: () -> Unit = {}) {
     val context = LocalContext.current
     val scripts by store.scripts.collectAsState()
     // Placed-widget manager data: every widget instance on the home screen
@@ -362,6 +373,44 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
             // re-explained what the cards and the FAB already show; the
             // list's job is picking a script, and the promise lives in the
             // onboarding (its canonical place).
+            // The feed entry is functional navigation, not a band: it is
+            // the discovery path the user asked for (2026-11-25) — browse
+            // the presets as live cards, add the ones you like.
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onFeed() },
+                    shape = RoundedCornerShape(Tokens.CardRadius),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Tokens.CardPadding),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        EmojiTile(name = "📰 フィード", seed = "feed", size = 48.dp, emojiSize = 24)
+                        Spacer(Modifier.size(Tokens.ItemSpacing))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "フィードで探す",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                "眺めて、気に入ったら入れる",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            "→",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
             if (placedWidgets.isNotEmpty()) {
                 item {
                     Card(
