@@ -47,6 +47,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -217,7 +219,12 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
     var editingId by remember { mutableStateOf<String?>(null) }
     var createSeed by remember { mutableStateOf<Triple<String, String, String>?>(null) }
     var showHelp by remember { mutableStateOf(false) }
-    var showFeed by remember { mutableStateOf(false) }
+    // Main tabs: 0 = feed (the home), 1 = my set (the script list). The
+    // feed's preview cache lives here so switching tabs never re-runs
+    // previews that already finished.
+    var tab by remember { mutableIntStateOf(0) }
+    val feedResults = remember { androidx.compose.runtime.mutableStateMapOf<String, app.scriptlet.engine.RunResult>() }
+    val feedGate = remember { kotlinx.coroutines.sync.Mutex() }
     // Manual replay from the help screen: same onboarding, but leaving it
     // returns to the list and the recorded version is left untouched.
     var replayOnboarding by remember { mutableStateOf(false) }
@@ -235,15 +242,6 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
                 prefs.edit().putInt("onboarding_version", 3).apply()
                 onboardingDone = true
                 replayOnboarding = false
-            },
-        )
-        showFeed -> app.scriptlet.ui.FeedScreen(
-            store = store,
-            engine = engine,
-            onBack = { showFeed = false },
-            onOpenScript = { id ->
-                showFeed = false
-                editingId = id
             },
         )
         showHelp -> HelpScreen(
@@ -278,13 +276,43 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
                 )
             }
         }
-        else -> ListScreen(
-            store = store,
-            onOpen = { editingId = it },
-            onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
-            onHelp = { showHelp = true },
-            onFeed = { showFeed = true },
-        )
+        else -> Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = tab == 0,
+                        onClick = { tab = 0 },
+                        icon = { Text("📰") },
+                        label = { Text("フィード") },
+                    )
+                    NavigationBarItem(
+                        selected = tab == 1,
+                        onClick = { tab = 1 },
+                        icon = { Text("📚") },
+                        label = { Text("マイセット") },
+                    )
+                }
+            },
+        ) { padding ->
+            androidx.compose.foundation.layout.Box(modifier = Modifier.padding(padding)) {
+                if (tab == 0) {
+                    app.scriptlet.ui.FeedScreen(
+                        store = store,
+                        engine = engine,
+                        results = feedResults,
+                        runGate = feedGate,
+                        onOpenScript = { id -> editingId = id },
+                    )
+                } else {
+                    ListScreen(
+                        store = store,
+                        onOpen = { editingId = it },
+                        onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
+                        onHelp = { showHelp = true },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -292,7 +320,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
 @Composable
 // internal (not private) so the JVM screenshot tests in this module can
 // render the real screen; no behaviour change.
-internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit, onFeed: () -> Unit = {}) {
+internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (String, String, String) -> Unit, onHelp: () -> Unit) {
     val context = LocalContext.current
     val scripts by store.scripts.collectAsState()
     // Placed-widget manager data: every widget instance on the home screen
@@ -335,7 +363,7 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scriptlet") },
+                title = { Text("マイセット") },
                 actions = {
                     IconButton(onClick = onHelp) {
                         Text(
@@ -373,44 +401,6 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
             // re-explained what the cards and the FAB already show; the
             // list's job is picking a script, and the promise lives in the
             // onboarding (its canonical place).
-            // The feed entry is functional navigation, not a band: it is
-            // the discovery path the user asked for (2026-11-25) — browse
-            // the presets as live cards, add the ones you like.
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable { onFeed() },
-                    shape = RoundedCornerShape(Tokens.CardRadius),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(Tokens.CardPadding),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        EmojiTile(name = "📰 フィード", seed = "feed", size = 48.dp, emojiSize = 24)
-                        Spacer(Modifier.size(Tokens.ItemSpacing))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "フィードで探す",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                "眺めて、気に入ったら入れる",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            "→",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
             if (placedWidgets.isNotEmpty()) {
                 item {
                     Card(

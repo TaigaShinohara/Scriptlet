@@ -1,6 +1,5 @@
 package app.scriptlet.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,22 +19,24 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.scriptlet.EmojiTile
@@ -45,6 +46,7 @@ import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.splitLeadingEmoji
 import kotlinx.coroutines.sync.Mutex
+import android.content.Context
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -57,7 +59,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * where it can be placed on the home screen; a preset whose code is
  * already in your list opens that copy instead.
  *
- * Keeping the feed light with 45 presets: LazyColumn only composes
+ * Keeping the feed light with 75 presets: LazyColumn only composes
  * near-visible cards, and preview runs are serialized through [runGate]
  * — one run at a time, and a card that scrolls away while queued is
  * cancelled before it ever runs. Finished results are cached in
@@ -69,20 +71,36 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * [autoRun] exists for the JVM screenshot tests: they must not start the
  * (native) engine, so their cards stay in the not-run state.
+ *
+ * Since v0.24.0 the feed is the app's home tab (bottom bar: フィード /
+ * マイセット). Cards can be bookmarked with 🔖; bookmarks persist in
+ * SharedPreferences and the chip at the top filters the feed down to
+ * them. The preview cache ([results]) is hoisted to the app level so
+ * tab switches never re-run finished previews.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FeedScreen(
     store: ScriptStore,
     engine: ScriptEngine,
-    onBack: () -> Unit,
+    results: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RunResult>,
+    runGate: Mutex,
     onOpenScript: (String) -> Unit,
     autoRun: Boolean = true,
 ) {
-    BackHandler(onBack = onBack)
     val scripts by store.scripts.collectAsState()
-    val results = remember { mutableStateMapOf<String, RunResult>() }
-    val runGate = remember { Mutex() }
+    val context = LocalContext.current
+    val bookmarkPrefs = remember {
+        context.getSharedPreferences("feed_bookmarks", Context.MODE_PRIVATE)
+    }
+    var bookmarks by remember {
+        mutableStateOf(bookmarkPrefs.getStringSet("keys", emptySet())?.toSet() ?: emptySet())
+    }
+    var bookmarkOnly by remember { mutableStateOf(false) }
+    fun toggleBookmark(key: String) {
+        bookmarks = if (key in bookmarks) bookmarks - key else bookmarks + key
+        bookmarkPrefs.edit().putStringSet("keys", bookmarks).apply()
+    }
     val order = remember {
         SampleScripts.all.indices.sortedBy { idx ->
             when (SampleScripts.keys[idx]) {
@@ -97,15 +115,6 @@ internal fun FeedScreen(
         topBar = {
             TopAppBar(
                 title = { Text("フィード") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(
-                            "← 一覧",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                },
             )
         },
     ) { padding ->
@@ -120,13 +129,42 @@ internal fun FeedScreen(
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
             item {
-                Text(
-                    "気に入ったものを「入れる」と、あなたのスクリプトに加わります。そのままホーム画面にも置けます。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column {
+                    Text(
+                        "気に入ったものを「入れる」と、あなたのスクリプトに加わります。そのままホーム画面にも置けます。🔖 はブックマークです。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = !bookmarkOnly,
+                            onClick = { bookmarkOnly = false },
+                            label = { Text("すべて") },
+                        )
+                        FilterChip(
+                            selected = bookmarkOnly,
+                            onClick = { bookmarkOnly = true },
+                            label = { Text("🔖 ブックマーク (" + bookmarks.size + ")") },
+                        )
+                    }
+                }
             }
-            items(order, key = { SampleScripts.keys[it] }) { index ->
+            val visible = if (bookmarkOnly) {
+                order.filter { SampleScripts.keys[it] in bookmarks }
+            } else {
+                order
+            }
+            if (bookmarkOnly && visible.isEmpty()) {
+                item {
+                    Text(
+                        "まだブックマークがありません。カードの「🔖 保存」で集められます。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(visible, key = { SampleScripts.keys[it] }) { index ->
                 val key = SampleScripts.keys[index]
                 val (name, code) = SampleScripts.all[index]
                 val desc = SampleScripts.descs.getOrElse(index) { "" }
@@ -137,6 +175,8 @@ internal fun FeedScreen(
                     seed = key,
                     result = results[key],
                     added = existing != null,
+                    bookmarked = key in bookmarks,
+                    onToggleBookmark = { toggleBookmark(key) },
                     loading = autoRun,
                     onAction = {
                         if (existing != null) {
@@ -176,6 +216,8 @@ private fun FeedCard(
     seed: String,
     result: RunResult?,
     added: Boolean,
+    bookmarked: Boolean,
+    onToggleBookmark: () -> Unit,
     loading: Boolean,
     onAction: () -> Unit,
 ) {
@@ -237,13 +279,27 @@ private fun FeedCard(
                 }
             }
             Spacer(Modifier.height(Tokens.ItemSpacing))
-            if (added) {
-                OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                    Text("追加済み（開く）", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.weight(1f)) {
+                    if (added) {
+                        OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                            Text("追加済み（開く）", fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                            Text("入れる", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
-            } else {
-                Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                    Text("入れる", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.size(8.dp))
+                if (bookmarked) {
+                    Button(onClick = onToggleBookmark) {
+                        Text("🔖 済み", fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    OutlinedButton(onClick = onToggleBookmark) {
+                        Text("🔖 保存")
+                    }
                 }
             }
         }

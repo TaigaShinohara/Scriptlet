@@ -119,7 +119,8 @@ class ScreenshotTest {
                     app.scriptlet.ui.FeedScreen(
                         store = store,
                         engine = ScriptEngine(store),
-                        onBack = {},
+                        results = androidx.compose.runtime.mutableStateMapOf(),
+                        runGate = kotlinx.coroutines.sync.Mutex(),
                         onOpenScript = {},
                         autoRun = false,
                     )

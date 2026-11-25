@@ -29,8 +29,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 39
-        versionName = "0.23.0-presets"
+        versionCode = 40
+        versionName = "0.24.0-homefeed"
     }
 
     signingConfigs {
