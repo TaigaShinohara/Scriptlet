@@ -1,6 +1,7 @@
 package app.scriptlet.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -101,7 +102,8 @@ internal fun FeedScreen(
     var bookmarks by remember {
         mutableStateOf(bookmarkPrefs.getStringSet("keys", emptySet())?.toSet() ?: emptySet())
     }
-    var bookmarkOnly by remember { mutableStateOf(false) }
+    // Feed filter: "all", "bm" (bookmarks) or a genre tag (v0.26.0).
+    var filter by remember { mutableStateOf("all") }
     fun toggleBookmark(key: String) {
         bookmarks = if (key in bookmarks) bookmarks - key else bookmarks + key
         bookmarkPrefs.edit().putStringSet("keys", bookmarks).apply()
@@ -151,29 +153,44 @@ internal fun FeedScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         FilterChip(
-                            selected = !bookmarkOnly,
-                            onClick = { bookmarkOnly = false },
+                            selected = filter == "all",
+                            onClick = { filter = "all" },
                             label = { Text("すべて") },
                         )
                         FilterChip(
-                            selected = bookmarkOnly,
-                            onClick = { bookmarkOnly = true },
+                            selected = filter == "bm",
+                            onClick = { filter = "bm" },
                             label = { Text("🔖 ブックマーク (" + bookmarks.size + ")") },
                         )
+                        for (tag in SampleScripts.tagOrder) {
+                            val count = SampleScripts.tags.values.count { tag in it }
+                            FilterChip(
+                                selected = filter == tag,
+                                onClick = { filter = tag },
+                                label = { Text(tag + " (" + count + ")") },
+                            )
+                        }
                     }
                 }
             }
-            val visible = if (bookmarkOnly) {
-                order.filter { SampleScripts.keys[it] in bookmarks }
-            } else {
-                order
+            val visible = when (filter) {
+                "bm" -> order.filter { SampleScripts.keys[it] in bookmarks }
+                "all" -> order
+                else -> order.filter { SampleScripts.tags[SampleScripts.keys[it]]?.contains(filter) == true }
             }
-            if (bookmarkOnly && visible.isEmpty()) {
+            if (visible.isEmpty()) {
                 item {
                     Text(
-                        "まだブックマークがありません。カードの「🔖 保存」で集められます。",
+                        if (filter == "bm") {
+                            "まだブックマークがありません。カードの「🔖 保存」で集められます。"
+                        } else {
+                            "このジャンルのものはまだありません。"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -191,6 +208,7 @@ internal fun FeedScreen(
                     result = results[key],
                     added = existing != null,
                     bookmarked = key in bookmarks,
+                    tags = SampleScripts.tags[key] ?: emptyList(),
                     onToggleBookmark = { toggleBookmark(key) },
                     loading = autoRun,
                     onAction = {
@@ -232,6 +250,7 @@ private fun FeedCard(
     result: RunResult?,
     added: Boolean,
     bookmarked: Boolean,
+    tags: List<String> = emptyList(),
     onToggleBookmark: () -> Unit,
     loading: Boolean,
     onAction: () -> Unit,
@@ -289,6 +308,13 @@ private fun FeedCard(
                             desc,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (tags.isNotEmpty()) {
+                        Text(
+                            tags.joinToString(" "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
