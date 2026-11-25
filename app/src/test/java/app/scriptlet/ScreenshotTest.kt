@@ -121,6 +121,7 @@ class ScreenshotTest {
                         engine = ScriptEngine(store),
                         results = androidx.compose.runtime.mutableStateMapOf(),
                         runGate = kotlinx.coroutines.sync.Mutex(),
+                        listState = androidx.compose.foundation.lazy.LazyListState(),
                         onOpenScript = {},
                         autoRun = false,
                     )

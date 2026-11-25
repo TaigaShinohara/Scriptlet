@@ -29,8 +29,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 40
-        versionName = "0.24.0-homefeed"
+        versionCode = 41
+        versionName = "0.25.0-floatnav"
     }
 
     signingConfigs {

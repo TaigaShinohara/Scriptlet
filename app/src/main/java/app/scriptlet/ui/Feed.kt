@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -72,8 +73,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [autoRun] exists for the JVM screenshot tests: they must not start the
  * (native) engine, so their cards stay in the not-run state.
  *
- * Since v0.24.0 the feed is the app's home tab (bottom bar: フィード /
- * マイセット). Cards can be bookmarked with 🔖; bookmarks persist in
+ * Since v0.24.0 the feed is the app's home; since v0.25.0 my set opens
+ * from the feed's floating 「📚 マイセット」 button (no bottom tab bar —
+ * the nested scaffolds also wasted a band of space at the top). Cards
+ * can be bookmarked with 🔖; bookmarks persist in
  * SharedPreferences and the chip at the top filters the feed down to
  * them. The preview cache ([results]) is hoisted to the app level so
  * tab switches never re-run finished previews.
@@ -85,7 +88,9 @@ internal fun FeedScreen(
     engine: ScriptEngine,
     results: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RunResult>,
     runGate: Mutex,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onOpenScript: (String) -> Unit,
+    onOpenMySet: () -> Unit = {},
     autoRun: Boolean = true,
 ) {
     val scripts by store.scripts.collectAsState()
@@ -117,14 +122,24 @@ internal fun FeedScreen(
                 title = { Text("フィード") },
             )
         },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onOpenMySet,
+                icon = { Text("📚") },
+                text = { Text("マイセット", fontWeight = FontWeight.Bold) },
+            )
+        },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(
                 start = Tokens.ScreenPadding,
                 end = Tokens.ScreenPadding,
                 top = Tokens.ScreenPadding,
-                bottom = Tokens.ScreenPadding,
+                // Room so the last card scrolls clear of the floating
+                // my-set button.
+                bottom = 96.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
         ) {
