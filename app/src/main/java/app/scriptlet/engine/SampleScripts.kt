@@ -487,7 +487,7 @@ try {
   let tMin = Math.min.apply(null, temps);
   let tMax = Math.max.apply(null, temps);
   if (tMax - tMin < 4) { tMax += 2; tMin -= 2; }
-  const W = 304, plotL = 8, plotR = 296, plotT = 12, plotB = 46, barBase = 62;
+  const W = 304, plotL = 26, plotR = 282, plotT = 12, plotB = 46, barBase = 62;
   const cv = widget.addCanvas(W, 76);
   const xFor = function (h) { return plotL + (plotR - plotL) * (h / 23); };
   const yFor = function (t) { return plotB - (plotB - plotT) * ((t - tMin) / (tMax - tMin)); };
@@ -500,12 +500,12 @@ try {
   const nowX = xFor(hour + now.getMinutes() / 60);
   cv.line(nowX, 8, nowX, barBase, NOW_LINE, 2);
   cv.circle(nowX, yFor(d.current.temperature_2m), 3, NOW_LINE);
-  cv.text(plotL, 0, Math.round(tMax) + "°", 9, pal.ink, false);
-  cv.text(plotL, plotB - 2, Math.round(tMin) + "°", 9, pal.sub, false);
+  cv.text(2, 0, Math.round(tMax) + "°", 9, pal.ink, false);
+  cv.text(2, plotB - 2, Math.round(tMin) + "°", 9, pal.sub, false);
   const pMax = Math.max.apply(null, probs.concat([0]));
   if (pMax > 0) cv.text(plotR - 52, barBase - 16, "降水 " + pMax + "%", 9, pal.precip, false);
   const hourMarks = [0, 6, 12, 18, 23];
-  for (const hm of hourMarks) cv.text(xFor(hm) - 6, 66, hm + "時", 8, pal.sub, false);
+  for (const hm of hourMarks) cv.text(xFor(hm) - 8, 66, hm + "時", 8, pal.sub, false);
 
   // ---- Canvas 2: the sun's arc ----
   const riseMin = Number(String(d.daily.sunrise[0]).slice(11, 13)) * 60 + Number(String(d.daily.sunrise[0]).slice(14, 16));

@@ -318,7 +318,7 @@ private fun FeedCard(
         // Preview zone: the widget itself, top-aligned on a soft ground so
         // a tall widget crops at the bottom like an image in a feed.
         Box(
-            modifier = Modifier.fillMaxWidth().height(210.dp)
+            modifier = Modifier.fillMaxWidth().height(232.dp)
                 .clip(RoundedCornerShape(topStart = Tokens.CardRadius, topEnd = Tokens.CardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(12.dp),

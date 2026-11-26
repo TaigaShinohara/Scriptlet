@@ -184,13 +184,28 @@ fun scriptSummary(item: ScriptItem): String =
             ?: ""
     }
 
-/** Asks the launcher to pin a widget for [scriptId] (the config screen preselects it when the launcher passes the extra through). */
+/** Asks the launcher to pin a widget for [scriptId] and binds it via [PinWidgetReceiver] when placed. */
 fun requestPinWidget(context: Context, scriptId: String): Boolean {
     val manager = AppWidgetManager.getInstance(context)
     if (!manager.isRequestPinAppWidgetSupported) return false
     val provider = ComponentName(context, ScriptletWidgetReceiver::class.java)
     val extras = Bundle().apply { putString(WidgetConfigActivity.EXTRA_SCRIPT_ID, scriptId) }
-    return manager.requestPinAppWidget(provider, extras, null)
+    val callbackIntent = Intent(context, app.scriptlet.widget.PinWidgetReceiver::class.java).apply {
+        putExtra(WidgetConfigActivity.EXTRA_SCRIPT_ID, scriptId)
+    }
+    val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            android.app.PendingIntent.FLAG_MUTABLE
+        } else {
+            0
+        }
+    val callback = android.app.PendingIntent.getBroadcast(
+        context,
+        scriptId.hashCode(),
+        callbackIntent,
+        flags,
+    )
+    return manager.requestPinAppWidget(provider, extras, callback)
 }
 
 /**
@@ -1292,6 +1307,10 @@ internal fun EditorScreen(
                 },
                 label = "editorPreview",
             ) { r ->
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Tokens.ItemSpacing),
+            ) {
             when (r) {
                 is RunResult.Success -> {
                     Row(
@@ -1350,6 +1369,7 @@ internal fun EditorScreen(
                     }
                 }
                 null -> {}
+            }
             }
             }
         }
