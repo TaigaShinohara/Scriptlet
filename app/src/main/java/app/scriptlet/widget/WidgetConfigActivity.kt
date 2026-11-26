@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -192,6 +193,13 @@ class WidgetConfigActivity : ComponentActivity() {
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Spacer(Modifier.height(8.dp))
+                        if (scripts.isEmpty()) {
+                            Text(
+                                "スクリプトがありません。アプリでスクリプトを作ると、ここで選べるようになります。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         scripts.forEach { script ->
                             val selected = script.id == selectedId
                             Card(
@@ -230,50 +238,6 @@ class WidgetConfigActivity : ComponentActivity() {
                             }
                         }
 
-                        if (selectedId != null) {
-                            Spacer(Modifier.height(16.dp))
-                            Text("プレビュー（外枠つき）", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "実際の表示と少し異なる場合があります。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(Tokens.SmallSpacing))
-                            val bgHex = bgOptions[bgIdx].second
-                            val frameColor = bgHex?.let {
-                                runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
-                            }
-                            var frame = Modifier.fillMaxWidth().clip(RoundedCornerShape(cornerOptions[cornerIdx].second.dp))
-                            if (frameColor != null) frame = frame.background(frameColor)
-                            frame = frame.padding(padOptions[padIdx].second.dp)
-                            Box(modifier = frame) {
-                                val baseDensity = LocalDensity.current
-                                CompositionLocalProvider(
-                                    LocalDensity provides Density(
-                                        baseDensity.density,
-                                        baseDensity.fontScale * scaleOptions[scaleIdx].second,
-                                    ),
-                                ) {
-                                    val tree = previewTree
-                                    if (tree != null) {
-                                        WidgetPreview(tree, Modifier.fillMaxWidth())
-                                    } else {
-                                        Text(
-                                            previewNote ?: "",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            // White only on the dark frames; light
-                                            // frames keep the default readable tone.
-                                            color = if (bgHex == "#111827" || bgHex == "#1f2937") {
-                                                Color.White
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         Spacer(Modifier.height(20.dp))
                         Text("見た目（任意）", style = MaterialTheme.typography.titleLarge)
 
@@ -302,6 +266,51 @@ class WidgetConfigActivity : ComponentActivity() {
                         chipRow("文字の大きさ", scaleOptions, scaleIdx) { scaleIdx = it }
                         Spacer(Modifier.height(16.dp))
                     }
+
+                    if (selectedId != null) {
+                        Spacer(Modifier.height(16.dp))
+                        Text("プレビュー（外枠つき）", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "実際の表示と少し異なる場合があります。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(Tokens.SmallSpacing))
+                        val bgHex = bgOptions[bgIdx].second
+                        val frameColor = bgHex?.let {
+                            runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+                        }
+                        var frame = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(cornerOptions[cornerIdx].second.dp))
+                        if (frameColor != null) frame = frame.background(frameColor)
+                        frame = frame.padding(padOptions[padIdx].second.dp)
+                        Box(modifier = frame) {
+                            val baseDensity = LocalDensity.current
+                            CompositionLocalProvider(
+                                LocalDensity provides Density(
+                                    baseDensity.density,
+                                    baseDensity.fontScale * scaleOptions[scaleIdx].second,
+                                ),
+                            ) {
+                                val tree = previewTree
+                                if (tree != null) {
+                                    WidgetPreview(tree, Modifier.fillMaxWidth())
+                                } else {
+                                    Text(
+                                        previewNote ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        // White only on the dark frames; light
+                                        // frames keep the default readable tone.
+                                        color = if (bgHex == "#111827" || bgHex == "#1f2937") {
+                                            Color.White
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
 
                     // The decision stays reachable: fixed at the bottom,
                     // outside the scroll area.

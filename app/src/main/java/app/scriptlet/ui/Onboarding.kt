@@ -398,7 +398,7 @@ fun OnboardingScreen(
                     7 -> PageShell(
                         stepLabel = "ステップ 1 / 3",
                         headline = "サンプルから選ぶ",
-                        sub = "完成品のサンプルが14本。まずは選ぶだけで大丈夫。",
+                        sub = "完成品のサンプルが" + SampleScripts.all.size + "本。まずは選ぶだけで大丈夫。",
                         reducedMotion = reducedMotion, active = active,
                         hero = { SampleListMock(reducedMotion) },
                     )
@@ -412,7 +412,7 @@ fun OnboardingScreen(
                     9 -> PageShell(
                         stepLabel = "ステップ 3 / 3",
                         headline = "ホーム画面に置く",
-                        sub = "「ホーム画面に追加」を押せば、もう完成です。",
+                        sub = "「ホーム画面に追加」→ 最後に「この内容で決定」を押せば完成です。",
                         reducedMotion = reducedMotion, active = active,
                         hero = { PlaceMock() },
                     )
@@ -885,7 +885,7 @@ private fun FinishPage(
             modifier = Modifier.fillMaxWidth(),
         ) { Text("作ってみる") }
         Spacer(Modifier.height(6.dp))
-        OutlinedButton(onClick = onList, modifier = Modifier.fillMaxWidth()) { Text("一覧から始める") }
+        OutlinedButton(onClick = onList, modifier = Modifier.fillMaxWidth()) { Text("フィードから始める") }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -936,7 +936,7 @@ private fun HomeMock(variant: Int, reducedMotion: Boolean) {
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MiniWidgetCard("🌤 24°", "大阪・晴れ", BrandSky, Modifier.weight(1f))
+                    MiniWidgetCard("🌤 24°", "東京・晴れ", BrandSky, Modifier.weight(1f))
                     MiniWidgetCard("⏳ 48日", "年末まで", BrandOrange, Modifier.weight(1f))
                 }
             }

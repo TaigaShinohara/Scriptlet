@@ -292,6 +292,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
             listState = feedListState,
             onOpenScript = { id -> editingId = id },
             onOpenMySet = { showMySet = true },
+            onHelp = { showHelp = true },
         )
     }
 }
@@ -551,15 +552,32 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
                             .filter { SampleScripts.keys[it] in SampleScripts.featuredKeys }
                             .forEach { sampleEntry(it) }
                         Spacer(Modifier.height(Tokens.SmallSpacing))
-                        Text(
-                            "そのほかのサンプル",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        SampleScripts.all.indices
-                            .filter { SampleScripts.keys[it] !in SampleScripts.featuredKeys }
-                            .forEach { sampleEntry(it) }
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                showChooser = false
+                                onBack()
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            ),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                EmojiTile(name = "📰 フィード", seed = "feed", size = 40.dp, emojiSize = 20)
+                                Spacer(Modifier.size(Tokens.ItemSpacing))
+                                Column {
+                                    Text("ほかのサンプルはフィードで", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "実プレビューを見ながら選べます（全" + SampleScripts.all.size + "本）",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(Tokens.SmallSpacing))
                         Card(
                             modifier = Modifier.fillMaxWidth().clickable {
@@ -615,8 +633,8 @@ private const val AI_PROMPT = """あなたは「Scriptlet」というAndroidア�
 - widget.addSpacer(12) 余白 / widget.addDivider() 区切り線
 - widget.addProgress(0.6) 進み具合バー（0〜1）
 - widget.addImage("https://…") 画像
-- widget.addCanvas(幅, 高さ) → Canvas。c.bg("#色")、c.rect(x, y, w, h, "#色")、c.circle(x, y, r, "#色")、c.line(x1, y1, x2, y2, "#色", 太さ)、c.text("文字", x, y, サイズ, "#色")、c.ring(x, y, r, 割合, 太さ, "#色")
-- ヘルパー: PieChart(canvas, x, y, r, [値...], ["#色"...]) / BarChart(canvas, x, y, w, h, [値...], "#色")
+- widget.addCanvas(幅, 高さ) → Canvas。c.background("#色")、c.rect(x, y, w, h, "#色")、c.circle(x, y, r, "#色")、c.line(x1, y1, x2, y2, "#色", 太さ)、c.text(x, y, "文字", サイズ, "#色")、c.ring(x, y, r, 太さ, 開始角, 描く角度, "#色")（角度は度数）
+- ヘルパー: PieChart(canvas, x, y, r, [[値, "#色"], ...])（値と色のペアの配列） / BarChart(canvas, x, y, w, h, [値...], 最大値, "#色")
 - widget.backgroundColor = new Color("#ffffff") / widget.setPadding(12, 12, 12, 12)
 - const res = await fetch("https://…"); const json = await res.json(); const text = await res.text();
 - Storage.get("キー") / Storage.set("キー", "値") でスクリプトごとに保存できる（文字列のみ）
@@ -643,7 +661,7 @@ internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("使い方") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("← 一覧") } },
+                navigationIcon = { TextButton(onClick = onBack) { Text("← 戻る") } },
             )
         },
     ) { padding ->
@@ -749,7 +767,7 @@ internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
             }
 
             sectionHead("🧭", "基本の流れ（3ステップ）", Tokens.Pink)
-            stepRow(1, "サンプルを選ぶ", "「＋ 新規」から。おすすめが近道です")
+            stepRow(1, "フィードで選ぶ", "気に入ったものを「入れる」と、あなたのスクリプトに加わります")
             stepArrow()
             stepRow(2, "実行して確かめる", "編集画面で「▶ 実行プレビュー」を押す")
             stepArrow()
@@ -1041,7 +1059,7 @@ internal fun EditorScreen(
         topBar = {
             TopAppBar(
                 title = { Text("スクリプト編集") },
-                navigationIcon = { TextButton(onClick = { backWithSave() }) { Text("← 一覧") } },
+                navigationIcon = { TextButton(onClick = { backWithSave() }) { Text("← 戻る") } },
                 actions = {
                     IconButton(onClick = { editorMenu = true }) {
                         Text("⋮", style = MaterialTheme.typography.titleLarge)
@@ -1182,6 +1200,11 @@ internal fun EditorScreen(
                     ) {
                         WidgetPreview(r.tree, Modifier.fillMaxWidth().padding(8.dp))
                     }
+                    Text(
+                        "実際のウィジェットと少し異なる場合があります。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     if (r.logs.isNotEmpty()) {
                         Text("ログ", style = MaterialTheme.typography.titleSmall)
                         Text(r.logs.joinToString("\n"), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))

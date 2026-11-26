@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +93,7 @@ internal fun FeedScreen(
     listState: androidx.compose.foundation.lazy.LazyListState,
     onOpenScript: (String) -> Unit,
     onOpenMySet: () -> Unit = {},
+    onHelp: () -> Unit = {},
     autoRun: Boolean = true,
 ) {
     val scripts by store.scripts.collectAsState()
@@ -102,8 +104,11 @@ internal fun FeedScreen(
     var bookmarks by remember {
         mutableStateOf(bookmarkPrefs.getStringSet("keys", emptySet())?.toSet() ?: emptySet())
     }
+    // Preview retry ticks (UX review 2026-11-26): bumping a key's tick
+    // re-runs its preview after a failure.
+    val retryTicks = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
     // Feed filter: "all", "bm" (bookmarks) or a genre tag (v0.26.0).
-    var filter by remember { mutableStateOf("all") }
+    var filter by rememberSaveable { mutableStateOf("all") }
     fun toggleBookmark(key: String) {
         bookmarks = if (key in bookmarks) bookmarks - key else bookmarks + key
         bookmarkPrefs.edit().putStringSet("keys", bookmarks).apply()
@@ -122,6 +127,16 @@ internal fun FeedScreen(
         topBar = {
             TopAppBar(
                 title = { Text("フィード") },
+                actions = {
+                    androidx.compose.material3.IconButton(onClick = onHelp) {
+                        Text(
+                            "？",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                },
             )
         },
         floatingActionButton = {
@@ -147,12 +162,6 @@ internal fun FeedScreen(
         ) {
             item {
                 Column {
-                    Text(
-                        "気に入ったものを「入れる」と、あなたのスクリプトに加わります。そのままホーム画面にも置けます。🔖 はブックマークです。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -210,6 +219,10 @@ internal fun FeedScreen(
                     bookmarked = key in bookmarks,
                     tags = SampleScripts.tags[key] ?: emptyList(),
                     onToggleBookmark = { toggleBookmark(key) },
+                    onRetry = {
+                        results.remove(key)
+                        retryTicks[key] = (retryTicks[key] ?: 0) + 1
+                    },
                     loading = autoRun,
                     onAction = {
                         if (existing != null) {
@@ -221,7 +234,7 @@ internal fun FeedScreen(
                     },
                 )
                 if (autoRun) {
-                    LaunchedEffect(key) {
+                    LaunchedEffect(key, retryTicks[key]) {
                         if (key !in results) {
                             // Serialized: at most one preview run at a time.
                             // withLock is cancellable, so a card that scrolls
@@ -252,6 +265,7 @@ private fun FeedCard(
     bookmarked: Boolean,
     tags: List<String> = emptyList(),
     onToggleBookmark: () -> Unit,
+    onRetry: () -> Unit = {},
     loading: Boolean,
     onAction: () -> Unit,
 ) {
@@ -283,6 +297,9 @@ private fun FeedCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    androidx.compose.material3.TextButton(onClick = onRetry) {
+                        Text("もう一度試す", fontWeight = FontWeight.Bold)
+                    }
                 }
                 else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
@@ -313,7 +330,7 @@ private fun FeedCard(
                     if (tags.isNotEmpty()) {
                         Text(
                             tags.joinToString(" "),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -333,14 +350,11 @@ private fun FeedCard(
                     }
                 }
                 Spacer(Modifier.size(8.dp))
-                if (bookmarked) {
-                    Button(onClick = onToggleBookmark) {
-                        Text("🔖 済み", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    OutlinedButton(onClick = onToggleBookmark) {
-                        Text("🔖 保存")
-                    }
+                OutlinedButton(onClick = onToggleBookmark) {
+                    Text(
+                        if (bookmarked) "🔖 済み" else "🔖 保存",
+                        fontWeight = if (bookmarked) FontWeight.Bold else FontWeight.Normal,
+                    )
                 }
             }
         }
