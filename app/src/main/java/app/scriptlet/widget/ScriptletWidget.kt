@@ -25,6 +25,9 @@ import androidx.glance.action.clickable
 import app.scriptlet.data.ScriptItem
 import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.ScriptEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Tap on the widget re-runs its script. */
@@ -146,11 +149,18 @@ abstract class BaseScriptletWidget : GlanceAppWidget() {
                     null
                 }
             }
+            val needsFallbackSurface = script == null || result is RunResult.Error || result !is RunResult.Success
             if (bgColor != null) {
                 frame = frame.background(androidx.glance.unit.ColorProvider(bgColor))
                 if (options.cornerDp > 0) {
                     frame = frame.cornerRadius(options.cornerDp.dp)
                 }
+            } else if (needsFallbackSurface) {
+                // Keep unconfigured/error widgets clearly visible on any wallpaper.
+                frame = frame
+                    .background(androidx.glance.unit.ColorProvider(androidx.compose.ui.graphics.Color(0xFFFFFBF7)))
+                    .cornerRadius(24.dp)
+                    .padding(16.dp)
             }
             if (options.paddingDp > 0) {
                 frame = frame.padding(options.paddingDp.dp)
@@ -171,6 +181,9 @@ abstract class BaseScriptletWidget : GlanceAppWidget() {
                     ),
                 )
             }
+            val fallbackStyle = androidx.glance.text.TextStyle(
+                color = androidx.glance.unit.ColorProvider(androidx.compose.ui.graphics.Color(0xFF2C1E26)),
+            )
             Box(modifier = tapAction) {
                 when {
                     script != null && result is RunResult.Success ->
@@ -178,17 +191,20 @@ abstract class BaseScriptletWidget : GlanceAppWidget() {
                     script != null && result is RunResult.Error -> Text(
                         text = "エラー: ${result.message}" +
                             (result.line?.let { "（${it}行目）" } ?: ""),
+                        style = fallbackStyle,
                         maxLines = 6,
                     )
-                    script != null -> Text("Scriptlet")
-                    appWidgetId == null -> Text("Scriptlet")
+                    script != null -> Text("Scriptlet", style = fallbackStyle)
+                    appWidgetId == null -> Text("Scriptlet", style = fallbackStyle)
                     prepared.mappedId == null -> Text(
                         "未設定のウィジェットです。タップで表示するスクリプトを選べます。",
+                        style = fallbackStyle,
                         maxLines = 6,
                     )
                     else -> Text(
                         "設定されたスクリプトが見つかりません（削除されたようです）。" +
                             "タップで選び直せます。",
+                        style = fallbackStyle,
                         maxLines = 6,
                     )
                 }
@@ -280,4 +296,33 @@ class ScriptletWidgetSmallReceiver : BaseScriptletWidgetReceiver() {
 
 class ScriptletWidgetLargeReceiver : BaseScriptletWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ScriptletWidgetLarge()
+}
+
+/** Receives the pinned widget id from requestPinAppWidget and binds the requested script immediately. */
+class PinWidgetReceiver : android.content.BroadcastReceiver() {
+    @android.annotation.SuppressLint("RestrictedApi")
+    override fun onReceive(context: Context, intent: android.content.Intent) {
+        val appWidgetId = intent.getIntExtra(
+            android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+            android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID,
+        )
+        val scriptId = intent.getStringExtra(WidgetConfigActivity.EXTRA_SCRIPT_ID)
+        if (appWidgetId == android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID || scriptId.isNullOrBlank()) {
+            return
+        }
+        val config = WidgetConfigStore(context)
+        if (config.scriptIdFor(appWidgetId) == null) {
+            config.setScript(appWidgetId, scriptId)
+        }
+        val pending = goAsync()
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                WidgetKinds.widgetFor(appContext, appWidgetId)
+                    .update(appContext, AppWidgetId(appWidgetId))
+            } finally {
+                pending.finish()
+            }
+        }
+    }
 }

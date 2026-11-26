@@ -156,6 +156,10 @@ private fun RenderNode(
             }
             if (!isRoot) {
                 if (node.width > 0) m = m.width(node.width.dp)
+                else if (node.direction == "horizontal" && node.children.any { it.type == "spacer" && it.length < 0 }) {
+                    // Expand horizontal rows containing flexible spacers so right-aligned items stay separated.
+                    m = m.fillMaxWidth()
+                }
                 if (node.height > 0) m = m.height(node.height.dp)
             }
             m = m.padding(

@@ -2,5 +2,6 @@
 <resources>
     <style name="Theme.Scriptlet" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#FFFBF7</item>
     </style>
 </resources>

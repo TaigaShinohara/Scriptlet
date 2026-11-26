@@ -955,18 +955,22 @@ private fun CodeToWidgetMock(reducedMotion: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Card(modifier = Modifier.weight(1.2f), colors = CardDefaults.cardColors(containerColor = Tokens.SlateDark)) {
+        Card(modifier = Modifier.weight(1.55f), colors = CardDefaults.cardColors(containerColor = Tokens.SlateDark)) {
             Text(
-                "const w =\n  new ListWidget();\nw.addText(\"Hello!\");",
+                "const w = new ListWidget();\nw.addText(\"Hello!\");",
                 color = Tokens.MockSky,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.5.sp,
+                    lineHeight = 15.sp,
+                ),
                 modifier = Modifier.padding(12.dp),
             )
         }
         // The arrow is static: a perpetual nudge loop would be decoration,
         // not meaning (skill v0.8.0). The direction reads fine standing still.
         Text("→", style = MaterialTheme.typography.headlineMedium, color = BrandPink, fontWeight = FontWeight.Bold)
-        MiniWidgetCard("Hello!", "Scriptlet", BrandPink, Modifier.weight(1f))
+        MiniWidgetCard("Hello!", "Scriptlet", BrandPink, Modifier.weight(0.95f))
     }
 }
 
@@ -1004,13 +1008,6 @@ private fun SampleListMock(reducedMotion: Boolean) {
     // stale sample names that no longer exist.)
     val barColor = MaterialTheme.colorScheme.onSurface
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "イラスト（手順の説明）",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.End),
-        )
-        Spacer(Modifier.height(6.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val tints = listOf(BrandPink, BrandOrange, BrandSky)
             listOf(150, 128, 142).forEachIndexed { i, titleWidth ->
@@ -1059,13 +1056,6 @@ private fun PreviewMock(reducedMotion: Boolean) {
     // イラスト label so it is not mistaken for a working screen.
     val barColor = MaterialTheme.colorScheme.onSurface
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "イラスト（手順の説明）",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.End),
-        )
-        Spacer(Modifier.height(6.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -1137,13 +1127,6 @@ private fun PreviewMock(reducedMotion: Boolean) {
 private fun PlaceMock() {
     val slotColor = MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "イラスト（手順の説明）",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.End),
-        )
-        Spacer(Modifier.height(6.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),

@@ -189,7 +189,7 @@ class WidgetConfigActivity : ComponentActivity() {
                     ) {
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "このウィジェットに表示するスクリプト",
+                            "表示するスクリプト",
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Spacer(Modifier.height(8.dp))
