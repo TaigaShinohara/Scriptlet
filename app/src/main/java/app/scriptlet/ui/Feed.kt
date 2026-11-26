@@ -1,5 +1,11 @@
 package app.scriptlet.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +32,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -35,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +59,7 @@ import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.SampleScripts
 import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.splitLeadingEmoji
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import android.content.Context
 import kotlinx.coroutines.sync.withLock
@@ -58,9 +70,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * preview of the widget it draws — featured first, then the newest
  * additions, then the rest. Browsing is the point — each card actually
  * runs its script so what you see is what the home screen gets.
- * 「入れる」 adds the preset to your scripts and opens it in the editor,
- * where it can be placed on the home screen; a preset whose code is
- * already in your list opens that copy instead.
+ * 「入れる」 adds the preset to your scripts and confirms with a
+ * snackbar whose 開く action opens it in the editor (v0.28.0 — it used
+ * to jump straight into the editor, which read as "something happened
+ * but what?"); the card's button flips to 追加済み（開く）, which opens
+ * the copy. A preset whose code is already in your list opens that
+ * copy instead.
  *
  * Keeping the feed light with 75 presets: LazyColumn only composes
  * near-visible cards, and preview runs are serialized through [runGate]
@@ -109,6 +124,10 @@ internal fun FeedScreen(
     val retryTicks = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
     // Feed filter: "all", "bm" (bookmarks) or a genre tag (v0.26.0).
     var filter by rememberSaveable { mutableStateOf("all") }
+    // Action feedback (v0.28.0): every tap answers. 「入れる」 confirms
+    // here instead of silently changing state.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     fun toggleBookmark(key: String) {
         bookmarks = if (key in bookmarks) bookmarks - key else bookmarks + key
         bookmarkPrefs.edit().putStringSet("keys", bookmarks).apply()
@@ -124,6 +143,7 @@ internal fun FeedScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("フィード") },
@@ -210,6 +230,13 @@ internal fun FeedScreen(
                 val (name, code) = SampleScripts.all[index]
                 val desc = SampleScripts.descs.getOrElse(index) { "" }
                 val existing = scripts.firstOrNull { it.code == code }
+              Box(
+                modifier = Modifier.animateItem(
+                    fadeInSpec = null,
+                    placementSpec = tween(Motion.MEDIUM2, easing = Motion.Standard),
+                    fadeOutSpec = tween(Motion.SHORT4, easing = Motion.StandardAccelerate),
+                ),
+              ) {
                 FeedCard(
                     name = name,
                     desc = desc,
@@ -229,10 +256,20 @@ internal fun FeedScreen(
                             onOpenScript(existing.id)
                         } else {
                             val item = store.create(name, code, desc)
-                            onOpenScript(item.id)
+                            scope.launch {
+                                val r = snackbarHostState.showSnackbar(
+                                    message = "『" + splitLeadingEmoji(name).second + "』をマイセットに追加しました",
+                                    actionLabel = "開く",
+                                    duration = SnackbarDuration.Short,
+                                )
+                                if (r == SnackbarResult.ActionPerformed) {
+                                    onOpenScript(item.id)
+                                }
+                            }
                         }
                     },
                 )
+              }
                 if (autoRun) {
                     LaunchedEffect(key, retryTicks[key]) {
                         if (key !in results) {
@@ -287,8 +324,13 @@ private fun FeedCard(
                 .padding(12.dp),
             contentAlignment = Alignment.TopCenter,
         ) {
-            when (result) {
-                is RunResult.Success -> WidgetPreview(result.tree)
+            Crossfade(
+                targetState = result,
+                animationSpec = tween(Motion.MEDIUM2, easing = Motion.Standard),
+                label = "feedPreview",
+            ) { current ->
+            when (current) {
+                is RunResult.Success -> WidgetPreview(current.tree)
                 is RunResult.Error -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
                     Spacer(Modifier.height(8.dp))
@@ -308,6 +350,7 @@ private fun FeedCard(
                         CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                     }
                 }
+            }
             }
         }
         Column(modifier = Modifier.padding(Tokens.CardPadding)) {
@@ -339,13 +382,22 @@ private fun FeedCard(
             Spacer(Modifier.height(Tokens.ItemSpacing))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.weight(1f)) {
-                    if (added) {
-                        OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                            Text("追加済み（開く）", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
-                            Text("入れる", fontWeight = FontWeight.Bold)
+                    AnimatedContent(
+                        targetState = added,
+                        transitionSpec = {
+                            fadeIn(tween(Motion.MEDIUM1, easing = Motion.StandardDecelerate)) togetherWith
+                                fadeOut(tween(Motion.SHORT4, easing = Motion.StandardAccelerate))
+                        },
+                        label = "addButton",
+                    ) { isAdded ->
+                        if (isAdded) {
+                            OutlinedButton(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                                Text("追加済み（開く）", fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                                Text("入れる", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

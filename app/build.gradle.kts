@@ -29,8 +29,8 @@ android {
         applicationId = "app.scriptlet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
-        versionName = "0.27.0-uxdetail"
+        versionCode = 44
+        versionName = "0.28.0-feedback-motion"
     }
 
     signingConfigs {

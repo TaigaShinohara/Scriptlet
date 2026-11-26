@@ -47,3 +47,29 @@ object Tokens {
     val ItemSpacing = 12.dp
     val SmallSpacing = 8.dp
 }
+
+/**
+ * Material 3 motion tokens (official values, m3.material.io — easing and
+ * duration token spec). Motion in this app explains state changes and
+ * answers input only (ART_DIRECTION: no ambient animation outside the
+ * onboarding). The emphasized two-segment path has no single-bezier
+ * form, so transitions use the emphasized-decelerate / -accelerate
+ * beziers and the standard set, per the official fallback guidance.
+ */
+object Motion {
+    /** emphasized decelerate — elements entering the screen. */
+    val EmphasizedDecelerate = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
+    /** emphasized accelerate — elements leaving the screen. */
+    val EmphasizedAccelerate = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
+    /** standard — utility transitions that begin and end on screen. */
+    val Standard = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+    /** standard decelerate — utility elements entering. */
+    val StandardDecelerate = androidx.compose.animation.core.CubicBezierEasing(0.0f, 0.0f, 0.0f, 1.0f)
+    /** standard accelerate — utility elements leaving. */
+    val StandardAccelerate = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0.0f, 1.0f, 1.0f)
+
+    const val SHORT4 = 200
+    const val MEDIUM1 = 250
+    const val MEDIUM2 = 300
+    const val MEDIUM4 = 400
+}

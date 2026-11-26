@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
+import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -46,7 +47,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -230,8 +243,47 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
     // returns to the list and the recorded version is left untouched.
     var replayOnboarding by remember { mutableStateOf(false) }
 
-    when {
-        !onboardingDone || replayOnboarding -> app.scriptlet.ui.OnboardingScreen(
+    // Screen transitions (v0.28.0): the M3 fade-through pattern — the
+    // outgoing screen fades out, the incoming one fades in while scaling
+    // from 92%, because the top-level screens have no spatial parent /
+    // child relation. Reduced-motion (animator duration scale 0) snaps.
+    val reducedMotion = remember {
+        try {
+            Settings.Global.getFloat(
+                appContext.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) == 0f
+        } catch (e: Exception) {
+            false
+        }
+    }
+    val screenKey = when {
+        !onboardingDone || replayOnboarding -> "onboarding"
+        showHelp -> "help"
+        createSeed != null -> "editor-new"
+        editingId != null -> "editor-" + editingId
+        showMySet -> "myset"
+        else -> "feed"
+    }
+    AnimatedContent(
+        targetState = screenKey,
+        transitionSpec = {
+            if (reducedMotion) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                (fadeIn(tween(app.scriptlet.ui.Motion.MEDIUM2, easing = app.scriptlet.ui.Motion.StandardDecelerate)) +
+                    scaleIn(
+                        initialScale = 0.92f,
+                        animationSpec = tween(app.scriptlet.ui.Motion.MEDIUM2, easing = app.scriptlet.ui.Motion.StandardDecelerate),
+                    )) togetherWith
+                    fadeOut(tween(app.scriptlet.ui.Motion.SHORT4, easing = app.scriptlet.ui.Motion.StandardAccelerate))
+            }
+        },
+        label = "screen",
+    ) { key ->
+    when (key) {
+        "onboarding" -> app.scriptlet.ui.OnboardingScreen(
             engine = engine,
             onFinish = { name, code, desc ->
                 prefs.edit().putInt("onboarding_version", 3).apply()
@@ -245,14 +297,14 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
                 replayOnboarding = false
             },
         )
-        showHelp -> HelpScreen(
+        "help" -> HelpScreen(
             onBack = { showHelp = false },
             onReplayOnboarding = {
                 showHelp = false
                 replayOnboarding = true
             },
         )
-        createSeed != null -> EditorScreen(
+        "editor-new" -> EditorScreen(
             store = store,
             engine = engine,
             initial = null,
@@ -261,7 +313,24 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
             seedDesc = createSeed!!.third,
             onBack = { createSeed = null },
         )
-        editingId != null -> {
+        "myset" -> ListScreen(
+            store = store,
+            onOpen = { editingId = it },
+            onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
+            onHelp = { showHelp = true },
+            onBack = { showMySet = false },
+        )
+        "feed" -> app.scriptlet.ui.FeedScreen(
+            store = store,
+            engine = engine,
+            results = feedResults,
+            runGate = feedGate,
+            listState = feedListState,
+            onOpenScript = { id -> editingId = id },
+            onOpenMySet = { showMySet = true },
+            onHelp = { showHelp = true },
+        )
+        else -> {
             val item = store.scripts.collectAsState().value.firstOrNull { it.id == editingId }
             // The script may have been deleted elsewhere: leave the editor from
             // an effect, never by writing state during composition.
@@ -277,23 +346,7 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
                 )
             }
         }
-        showMySet -> ListScreen(
-            store = store,
-            onOpen = { editingId = it },
-            onNew = { name, code, desc -> createSeed = Triple(name, code, desc) },
-            onHelp = { showHelp = true },
-            onBack = { showMySet = false },
-        )
-        else -> app.scriptlet.ui.FeedScreen(
-            store = store,
-            engine = engine,
-            results = feedResults,
-            runGate = feedGate,
-            listState = feedListState,
-            onOpenScript = { id -> editingId = id },
-            onOpenMySet = { showMySet = true },
-            onHelp = { showHelp = true },
-        )
+    }
     }
 }
 
@@ -339,9 +392,14 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
         }
     }
     var showChooser by remember { mutableStateOf(false) }
-    var pinNote by remember { mutableStateOf<String?>(null) }
+    // Action feedback (v0.28.0): pin results, duplicates and deletions
+    // answer in a snackbar. The old pinNote was a small standing line
+    // in the list flow — easy to miss and it never went away.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("マイセット") },
@@ -447,26 +505,55 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
                     }
                 }
             }
-            pinNote?.let { note ->
-                item {
-                    Text(note, color = MaterialTheme.colorScheme.primary)
-                }
-            }
             items(scripts, key = { it.id }) { item ->
+              Box(
+                modifier = Modifier.animateItem(
+                    fadeInSpec = null,
+                    placementSpec = tween(app.scriptlet.ui.Motion.MEDIUM2, easing = app.scriptlet.ui.Motion.Standard),
+                    fadeOutSpec = tween(app.scriptlet.ui.Motion.SHORT4, easing = app.scriptlet.ui.Motion.StandardAccelerate),
+                ),
+              ) {
                 ScriptCard(
                     item = item,
                     onOpen = { onOpen(item.id) },
                     onPin = {
-                        pinNote = if (requestPinWidget(context, item.id)) {
-                            "ホーム画面への追加を確認してください"
-                        } else {
-                            "この端末のランチャーではアプリからの追加に対応していません"
+                        val ok = requestPinWidget(context, item.id)
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = if (ok) {
+                                    "ホーム画面への追加を確認してください"
+                                } else {
+                                    "この端末のランチャーではアプリからの追加に対応していません"
+                                },
+                                duration = if (ok) SnackbarDuration.Short else SnackbarDuration.Long,
+                            )
                         }
                     },
-                    onDuplicate = { store.create(item.name + " のコピー", item.code, item.desc); refreshWidgetsAsync(context) },
+                    onDuplicate = {
+                        val copy = store.create(item.name + " のコピー", item.code, item.desc)
+                        refreshWidgetsAsync(context)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("『" + copy.name + "』を作りました")
+                        }
+                    },
                     onRename = { newName -> store.update(item.copy(name = newName)); refreshWidgetsAsync(context) },
-                    onDelete = { store.delete(item.id); refreshWidgetsAsync(context) },
+                    onDelete = {
+                        store.delete(item.id)
+                        refreshWidgetsAsync(context)
+                        scope.launch {
+                            val r = snackbarHostState.showSnackbar(
+                                message = "『" + item.name + "』を削除しました",
+                                actionLabel = "元に戻す",
+                                duration = SnackbarDuration.Short,
+                            )
+                            if (r == SnackbarResult.ActionPerformed) {
+                                store.create(item.name, item.code, item.desc)
+                                refreshWidgetsAsync(context)
+                            }
+                        }
+                    },
                 )
+              }
             }
             if (scripts.isEmpty()) {
                 item {
@@ -650,6 +737,8 @@ internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var promptCopied by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
@@ -658,6 +747,7 @@ internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
         }
     }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("使い方") },
@@ -865,6 +955,9 @@ internal fun HelpScreen(onBack: () -> Unit, onReplayOnboarding: () -> Unit) {
                 onClick = {
                     clipboard.setText(AnnotatedString(AI_PROMPT))
                     promptCopied = true
+                    scope.launch {
+                        snackbarHostState.showSnackbar("プロンプトをコピーしました")
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(if (promptCopied) "✓ コピーしました" else "📋 プロンプトをコピー") }
@@ -995,13 +1088,13 @@ internal fun EditorScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var currentId by remember { mutableStateOf(initial?.id) }
     var name by remember { mutableStateOf(initial?.name ?: seedName) }
     var code by remember { mutableStateOf(initial?.code ?: seedCode) }
     var running by remember { mutableStateOf(false) }
     var editorMenu by remember { mutableStateOf(false) }
     var pasteNote by remember { mutableStateOf<String?>(null) }
-    var pinNote by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<RunResult?>(null) }
     var bigPreview by remember { mutableStateOf<RunResult.Success?>(null) }
     var pendingPaste by remember { mutableStateOf<String?>(null) }
@@ -1056,6 +1149,7 @@ internal fun EditorScreen(
     BackHandler { backWithSave() }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("スクリプト編集") },
@@ -1174,18 +1268,31 @@ internal fun EditorScreen(
                         // Always available, even for a brand-new script: save
                         // first so the config screen can preselect it.
                         val id = if (currentId == null || isDirty()) save() else currentId!!
-                        pinNote = if (requestPinWidget(context, id)) {
-                            "ホーム画面への追加を確認してください"
-                        } else {
-                            "この端末のランチャーでは対応していません"
+                        val pinOk = requestPinWidget(context, id)
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = if (pinOk) {
+                                    "ホーム画面への追加を確認してください"
+                                } else {
+                                    "この端末のランチャーでは対応していません"
+                                },
+                                duration = if (pinOk) SnackbarDuration.Short else SnackbarDuration.Long,
+                            )
                         }
                     },
                     modifier = Modifier.weight(1f),
                 ) { Text("ホーム画面に追加") }
             }
-            pinNote?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
 
-            when (val r = result) {
+            AnimatedContent(
+                targetState = result,
+                transitionSpec = {
+                    fadeIn(tween(app.scriptlet.ui.Motion.MEDIUM1, easing = app.scriptlet.ui.Motion.StandardDecelerate)) togetherWith
+                        fadeOut(tween(app.scriptlet.ui.Motion.SHORT4, easing = app.scriptlet.ui.Motion.StandardAccelerate))
+                },
+                label = "editorPreview",
+            ) { r ->
+            when (r) {
                 is RunResult.Success -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1243,6 +1350,7 @@ internal fun EditorScreen(
                     }
                 }
                 null -> {}
+            }
             }
         }
     }
