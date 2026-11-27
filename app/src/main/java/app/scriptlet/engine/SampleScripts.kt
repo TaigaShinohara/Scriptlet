@@ -103,6 +103,8 @@ object SampleScripts {
         "dream",
         "gratitude",
         "chord",
+        "deadline-radar",
+        "seido-deadlines",
     )
 
     /** One-line descriptions, index-aligned with [keys]/[all]; shown wherever a script is picked. */
@@ -207,13 +209,15 @@ object SampleScripts {
         "朝の夢メモのテンプレ",
         "日替わりの感謝テーマ",
         "日替わりのコード進行とキー",
+        "サブスク・ポイント・手続きの期限を近い順に静かに表示（書き換え式）",
+        "確定申告など毎年の主な制度の期限（登録なし）",
     )
 
     /** The showcase presets: full real-world widgets, offered first when creating. */
     val featuredKeys: Set<String> = setOf("showcase-weather", "quake", "fx-chart", "analog-clock")
 
     /** Newest preset batch (2026-11-25 batch 3); the feed shows them right after the featured ones. */
-    val freshKeys: Set<String> = setOf("kaleido", "rain-window", "topo", "bubbles", "tile-pattern", "meds", "plant", "fridge", "sleep-debt", "eye-rest", "fortune-cookie", "lucky", "monster-egg", "tide", "quake-count", "era", "seconds-today", "proverb", "math-drill", "pref", "constellation", "coffee", "dream", "gratitude", "chord")
+    val freshKeys: Set<String> = setOf("kaleido", "rain-window", "topo", "bubbles", "tile-pattern", "meds", "plant", "fridge", "sleep-debt", "eye-rest", "fortune-cookie", "lucky", "monster-egg", "tide", "quake-count", "era", "seconds-today", "proverb", "math-drill", "pref", "constellation", "coffee", "dream", "gratitude", "chord", "deadline-radar", "seido-deadlines")
 
     /**
      * The bundled templates seeded into the script list on first launch
@@ -330,6 +334,8 @@ object SampleScripts {
         "dream" to listOf("🧺 生活"),
         "gratitude" to listOf("🧺 生活"),
         "chord" to listOf("📚 ことば・学び", "🎲 お遊び"),
+        "deadline-radar" to listOf("🧺 生活"),
+        "seido-deadlines" to listOf("🧺 生活", "🕐 時計と暦"),
     )
 
     /** Tag display order in the feed's filter row. */
@@ -4288,6 +4294,77 @@ const widget=new ListWidget();widget.setPadding(12,14,12,14);
 const t=widget.addText("🎸 今日のコード進行");t.font=Font.boldSystemFont(14);t.textColor=new Color("#c2185b");
 const b=widget.addText(PROGS[idx%PROGS.length][0]);b.font=Font.boldSystemFont(20);
 const s=widget.addText("キー "+KEYS[idx%KEYS.length]+" ／ "+PROGS[idx%PROGS.length][1]);s.font=Font.systemFont(11);s.textColor=new Color("#888888");
+Script.setWidget(widget);
+""".trimIndent(),
+        "📅 期限レーダー" to """
+// 📅 期限レーダー（下の ITEMS を書き換えて使う）
+const ITEMS=[
+ {title:"ポイント失効", date:"2026-12-05", kind:"ポイント", repeat:"none"},
+ {title:"サブスク更新", date:"2026-12-25", kind:"サブスク", repeat:"monthly", amount:1743},
+ {title:"確定申告", date:"2027-03-15", kind:"手続き", repeat:"yearly"},
+ {title:"免許更新", date:"2027-06-10", kind:"手続き", repeat:"none"}
+];
+function parseD(s){const p=s.split("-");return new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10));}
+function fmt(n){return (""+n).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+const now=new Date();const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+const ups=[],past=[];
+for(const it of ITEMS){
+ let d=parseD(it.date);
+ if(it.repeat==="monthly"||it.repeat==="yearly"){
+   let guard=0;
+   while(d<today&&guard<240){ if(it.repeat==="monthly"){d=new Date(d.getFullYear(),d.getMonth()+1,d.getDate());}else{d=new Date(d.getFullYear()+1,d.getMonth(),d.getDate());} guard++; }
+   it.next=d; ups.push(it);
+ } else if(d>=today){ it.next=d; ups.push(it); }
+ else { const ago=Math.round((today-d)/86400000); if(ago<=30){ it.ago=ago; past.push(it);} }
+}
+ups.sort(function(a,b){return a.next-b.next;});
+function colorFor(days){ if(days<=7)return "#c2185b"; if(days<=30)return "#e65100"; return "#555555"; }
+function md(d){return (d.getMonth()+1)+"/"+d.getDate();}
+const widget=new ListWidget();widget.setPadding(12,14,12,14);
+const h=widget.addText("📅 ちかい期限");h.font=Font.boldSystemFont(14);h.textColor=new Color("#0277bd");
+if(ups.length===0){ const t=widget.addText("しばらく先のものばかりです");t.font=Font.boldSystemFont(16); }
+const show=ups.slice(0,3);
+for(const it of show){
+ const days=Math.round((it.next-today)/86400000);
+ const label=days===0?"今日":("あと "+days+" 日");
+ const t=widget.addText(label+" ・ "+it.title);t.font=Font.boldSystemFont(16);t.textColor=new Color(colorFor(days));
+ let sub=it.kind+" ・ "+md(it.next);
+ if(it.amount)sub+=" ・ ¥"+fmt(it.amount);
+ const s=widget.addText(sub);s.font=Font.systemFont(10);s.textColor=new Color("#888888");
+}
+if(past.length>0){ const p0=past[0]; const pt=widget.addText("過ぎたもの："+p0.title+"（"+md(parseD(p0.date))+"）");pt.font=Font.systemFont(10);pt.textColor=new Color("#aaaaaa"); }
+const f=widget.addText("期限はスクリプト内の ITEMS で変更できます");f.font=Font.systemFont(10);f.textColor=new Color("#888888");
+Script.setWidget(widget);
+""".trimIndent(),
+        "🏛 制度の期限" to """
+// 🏛 制度の期限（毎年の主な期限・データ登録なし）
+const ITEMS=[
+ {title:"確定申告", m:3, d:15},
+ {title:"自動車税", m:5, d:31},
+ {title:"固定資産税 第1期", m:6, d:30, note:"目安"},
+ {title:"ふるさと納税", m:12, d:31}
+];
+const now=new Date();const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+const ups=[];
+for(const it of ITEMS){
+ let dt=new Date(today.getFullYear(),it.m-1,it.d);
+ if(dt<today)dt=new Date(today.getFullYear()+1,it.m-1,it.d);
+ it.next=dt; ups.push(it);
+}
+ups.sort(function(a,b){return a.next-b.next;});
+function colorFor(days){ if(days<=7)return "#c2185b"; if(days<=30)return "#e65100"; return "#555555"; }
+function md(d){return (d.getMonth()+1)+"/"+d.getDate();}
+const widget=new ListWidget();widget.setPadding(12,14,12,14);
+const h=widget.addText("🏛 制度の期限");h.font=Font.boldSystemFont(14);h.textColor=new Color("#0277bd");
+const show=ups.slice(0,3);
+for(const it of show){
+ const days=Math.round((it.next-today)/86400000);
+ const label=days===0?"今日":("あと "+days+" 日");
+ const t=widget.addText(label+" ・ "+it.title);t.font=Font.boldSystemFont(16);t.textColor=new Color(colorFor(days));
+ let sub=md(it.next); if(it.note)sub+=" ・ "+it.note;
+ const s=widget.addText(sub);s.font=Font.systemFont(10);s.textColor=new Color("#888888");
+}
+const f=widget.addText("主な制度の期限です。固定資産税の期日は自治体で異なります");f.font=Font.systemFont(10);f.textColor=new Color("#888888");
 Script.setWidget(widget);
 """.trimIndent()
     )
