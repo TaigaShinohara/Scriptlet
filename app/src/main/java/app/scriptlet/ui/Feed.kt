@@ -1,7 +1,6 @@
 package app.scriptlet.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,13 +18,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +38,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -55,61 +53,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.scriptlet.EmojiTile
 import app.scriptlet.data.ScriptStore
-import app.scriptlet.engine.RunResult
 import app.scriptlet.engine.SampleScripts
-import app.scriptlet.engine.ScriptEngine
 import app.scriptlet.splitLeadingEmoji
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import android.content.Context
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * The discovery feed: every bundled preset as a big card with a live
- * preview of the widget it draws — featured first, then the newest
- * additions, then the rest. Browsing is the point — each card actually
- * runs its script so what you see is what the home screen gets.
+ * The discovery feed: every bundled preset as a big card — featured
+ * first, then the newest additions, then the rest. Browsing is the
+ * point.
+ *
+ * Since v0.29.1 the cards show a DUMMY preview (user direction
+ * 2026-11-27: running every preset for real — fetches included — made
+ * the feed heavy). The preview zone is a fixed placeholder: the
+ * preset's emoji tile over skeleton lines, with a caption saying the
+ * real rendering appears when the preset is opened. Real execution
+ * happens only in the editor's preview, exactly as before. Nothing in
+ * the feed runs a script, so opening and scrolling the feed costs no
+ * engine runs and no network.
+ *
  * 「入れる」 adds the preset to your scripts and confirms with a
- * snackbar whose 開く action opens it in the editor (v0.28.0 — it used
- * to jump straight into the editor, which read as "something happened
- * but what?"); the card's button flips to 追加済み（開く）, which opens
- * the copy. A preset whose code is already in your list opens that
- * copy instead.
- *
- * Keeping the feed light with 75 presets: LazyColumn only composes
- * near-visible cards, and preview runs are serialized through [runGate]
- * — one run at a time, and a card that scrolls away while queued is
- * cancelled before it ever runs. Finished results are cached in
- * [results] for the whole visit, so scrolling back never re-runs.
- *
- * Preview runs are keyed "feed-<sample key>" so their Storage (e.g. the
- * weather cache) persists across visits without colliding with the
- * UUID-keyed storage of real scripts.
- *
- * [autoRun] exists for the JVM screenshot tests: they must not start the
- * (native) engine, so their cards stay in the not-run state.
+ * snackbar whose 開く action opens it in the editor (v0.28.0); the
+ * card's button flips to 追加済み（開く）, which opens the copy. A
+ * preset whose code is already in your list opens that copy instead.
  *
  * Since v0.24.0 the feed is the app's home; since v0.25.0 my set opens
- * from the feed's floating 「📚 マイセット」 button (no bottom tab bar —
- * the nested scaffolds also wasted a band of space at the top). Cards
- * can be bookmarked with 🔖; bookmarks persist in
+ * from the feed's floating 「📚 マイセット」 button (no bottom tab
+ * bar). Cards can be bookmarked with 🔖; bookmarks persist in
  * SharedPreferences and the chip at the top filters the feed down to
- * them. The preview cache ([results]) is hoisted to the app level so
- * tab switches never re-run finished previews.
+ * them. The scroll state is hoisted to the app level so tab switches
+ * keep the position.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FeedScreen(
     store: ScriptStore,
-    engine: ScriptEngine,
-    results: androidx.compose.runtime.snapshots.SnapshotStateMap<String, RunResult>,
-    runGate: Mutex,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onOpenScript: (String) -> Unit,
     onOpenMySet: () -> Unit = {},
     onHelp: () -> Unit = {},
-    autoRun: Boolean = true,
 ) {
     val scripts by store.scripts.collectAsState()
     val context = LocalContext.current
@@ -119,9 +101,6 @@ internal fun FeedScreen(
     var bookmarks by remember {
         mutableStateOf(bookmarkPrefs.getStringSet("keys", emptySet())?.toSet() ?: emptySet())
     }
-    // Preview retry ticks (UX review 2026-11-26): bumping a key's tick
-    // re-runs its preview after a failure.
-    val retryTicks = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
     // Feed filter: "all", "bm" (bookmarks) or a genre tag (v0.26.0).
     var filter by rememberSaveable { mutableStateOf("all") }
     // Action feedback (v0.28.0): every tap answers. 「入れる」 confirms
@@ -241,16 +220,10 @@ internal fun FeedScreen(
                     name = name,
                     desc = desc,
                     seed = key,
-                    result = results[key],
                     added = existing != null,
                     bookmarked = key in bookmarks,
                     tags = SampleScripts.tags[key] ?: emptyList(),
                     onToggleBookmark = { toggleBookmark(key) },
-                    onRetry = {
-                        results.remove(key)
-                        retryTicks[key] = (retryTicks[key] ?: 0) + 1
-                    },
-                    loading = autoRun,
                     onAction = {
                         if (existing != null) {
                             onOpenScript(existing.id)
@@ -270,23 +243,6 @@ internal fun FeedScreen(
                     },
                 )
               }
-                if (autoRun) {
-                    LaunchedEffect(key, retryTicks[key]) {
-                        if (key !in results) {
-                            // Serialized: at most one preview run at a time.
-                            // withLock is cancellable, so a card that scrolls
-                            // away while queued drops out without running.
-                            runGate.withLock {
-                                if (key !in results) {
-                                    val r = withTimeoutOrNull(20_000) {
-                                        engine.runDetached("feed-$key", code).await()
-                                    } ?: RunResult.Error("プレビューの実行が時間切れになりました", null, emptyList())
-                                    results[key] = r
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -297,13 +253,10 @@ private fun FeedCard(
     name: String,
     desc: String,
     seed: String,
-    result: RunResult?,
     added: Boolean,
     bookmarked: Boolean,
     tags: List<String> = emptyList(),
     onToggleBookmark: () -> Unit,
-    onRetry: () -> Unit = {},
-    loading: Boolean,
     onAction: () -> Unit,
 ) {
     val (_, restName) = splitLeadingEmoji(name)
@@ -315,42 +268,29 @@ private fun FeedCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        // Preview zone: the widget itself, top-aligned on a soft ground so
-        // a tall widget crops at the bottom like an image in a feed.
+        // Preview zone: a fixed dummy (v0.29.1). The real rendering is
+        // only produced when the preset is opened in the editor.
         Box(
             modifier = Modifier.fillMaxWidth().height(232.dp)
                 .clip(RoundedCornerShape(topStart = Tokens.CardRadius, topEnd = Tokens.CardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(12.dp),
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.Center,
         ) {
-            Crossfade(
-                targetState = result,
-                animationSpec = tween(Motion.MEDIUM2, easing = Motion.Standard),
-                label = "feedPreview",
-            ) { current ->
-            when (current) {
-                is RunResult.Success -> WidgetPreview(current.tree)
-                is RunResult.Error -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "プレビューを表示できませんでした",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    androidx.compose.material3.TextButton(onClick = onRetry) {
-                        Text("もう一度試す", fontWeight = FontWeight.Bold)
-                    }
-                }
-                else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
-                    if (loading) {
-                        Spacer(Modifier.height(10.dp))
-                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
-                    }
-                }
-            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
+                Spacer(Modifier.height(16.dp))
+                DummyBar(width = 190.dp)
+                Spacer(Modifier.height(9.dp))
+                DummyBar(width = 140.dp)
+                Spacer(Modifier.height(9.dp))
+                DummyBar(width = 165.dp)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "開くと実際の表示が見られます",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         Column(modifier = Modifier.padding(Tokens.CardPadding)) {
@@ -411,4 +351,14 @@ private fun FeedCard(
             }
         }
     }
+}
+
+/** One skeleton line of the feed's dummy preview. */
+@Composable
+private fun DummyBar(width: androidx.compose.ui.unit.Dp) {
+    Box(
+        modifier = Modifier.width(width).height(12.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)),
+    )
 }

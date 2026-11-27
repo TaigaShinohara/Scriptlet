@@ -247,12 +247,10 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
     var showHelp by remember { mutableStateOf(false) }
     // The feed is the home. My set (the script list) opens over it from
     // the feed's floating button (user direction, 2026-11-25: no bottom
-    // tab bar). The feed's preview cache and scroll state live here so
-    // going to my set and back never re-runs previews or loses the
-    // scroll position.
+    // tab bar). The feed's scroll state lives here so going to my set
+    // and back keeps the scroll position. (Feed cards show a dummy
+    // preview since v0.29.1, so there is no preview cache anymore.)
     var showMySet by remember { mutableStateOf(false) }
-    val feedResults = remember { androidx.compose.runtime.mutableStateMapOf<String, app.scriptlet.engine.RunResult>() }
-    val feedGate = remember { kotlinx.coroutines.sync.Mutex() }
     val feedListState = androidx.compose.foundation.lazy.rememberLazyListState()
     // Manual replay from the help screen: same onboarding, but leaving it
     // returns to the list and the recorded version is left untouched.
@@ -337,9 +335,6 @@ private fun ScriptletApp(store: ScriptStore, engine: ScriptEngine) {
         )
         "feed" -> app.scriptlet.ui.FeedScreen(
             store = store,
-            engine = engine,
-            results = feedResults,
-            runGate = feedGate,
             listState = feedListState,
             onOpenScript = { id -> editingId = id },
             onOpenMySet = { showMySet = true },
@@ -673,7 +668,7 @@ internal fun ListScreen(store: ScriptStore, onOpen: (String) -> Unit, onNew: (St
                                 Column {
                                     Text("ほかのサンプルはフィードで", style = MaterialTheme.typography.titleMedium)
                                     Text(
-                                        "実プレビューを見ながら選べます（全" + SampleScripts.all.size + "本）",
+                                        "カードを眺めながら選べます（全" + SampleScripts.all.size + "本）",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
