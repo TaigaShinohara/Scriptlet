@@ -63,14 +63,15 @@ import android.content.Context
  * first, then the newest additions, then the rest. Browsing is the
  * point.
  *
- * Since v0.29.1 the cards show a DUMMY preview (user direction
- * 2026-11-27: running every preset for real — fetches included — made
- * the feed heavy). The preview zone is a fixed placeholder: the
- * preset's emoji tile over skeleton lines, with a caption saying the
- * real rendering appears when the preset is opened. Real execution
- * happens only in the editor's preview, exactly as before. Nothing in
- * the feed runs a script, so opening and scrolling the feed costs no
- * engine runs and no network.
+ * The cards never run scripts (user direction 2026-11-27: running
+ * every preset for real — fetches included — made the feed heavy).
+ * v0.29.1 first shipped a skeleton placeholder, but the user found it
+ * told him nothing about what a widget shows (2026-11-28), so since
+ * v0.29.2 the preview zone renders a bundled SAMPLE tree per preset
+ * (see [FeedPreviews]): the real layout with sample data, labelled
+ * サンプル表示. Real execution happens only in the editor's preview,
+ * exactly as before. Nothing in the feed runs a script, so opening
+ * and scrolling the feed costs no engine runs and no network.
  *
  * 「入れる」 adds the preset to your scripts and confirms with a
  * snackbar whose 開く action opens it in the editor (v0.28.0); the
@@ -100,6 +101,12 @@ internal fun FeedScreen(
     }
     var bookmarks by remember {
         mutableStateOf(bookmarkPrefs.getStringSet("keys", emptySet())?.toSet() ?: emptySet())
+    }
+    // Bundled sample trees for the preview zones (v0.29.2), loaded once
+    // off the main thread; cards fall back to the skeleton until ready.
+    var previews by remember { mutableStateOf<Map<String, app.scriptlet.engine.WidgetNode>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        previews = FeedPreviews.load(context)
     }
     // Feed filter: "all", "bm" (bookmarks) or a genre tag (v0.26.0).
     var filter by rememberSaveable { mutableStateOf("all") }
@@ -220,6 +227,7 @@ internal fun FeedScreen(
                     name = name,
                     desc = desc,
                     seed = key,
+                    previewTree = previews?.get(key),
                     added = existing != null,
                     bookmarked = key in bookmarks,
                     tags = SampleScripts.tags[key] ?: emptyList(),
@@ -253,6 +261,7 @@ private fun FeedCard(
     name: String,
     desc: String,
     seed: String,
+    previewTree: app.scriptlet.engine.WidgetNode?,
     added: Boolean,
     bookmarked: Boolean,
     tags: List<String> = emptyList(),
@@ -268,29 +277,43 @@ private fun FeedCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        // Preview zone: a fixed dummy (v0.29.1). The real rendering is
-        // only produced when the preset is opened in the editor.
+        // Preview zone: the bundled sample tree (v0.29.2) — the real
+        // layout with sample data, top-aligned so a tall widget crops
+        // at the bottom like an image in a feed. Until the samples are
+        // loaded (or for a preset without one), the skeleton dummy
+        // from v0.29.1 stands in.
         Box(
             modifier = Modifier.fillMaxWidth().height(232.dp)
                 .clip(RoundedCornerShape(topStart = Tokens.CardRadius, topEnd = Tokens.CardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(12.dp),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopCenter,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
-                Spacer(Modifier.height(16.dp))
-                DummyBar(width = 190.dp)
-                Spacer(Modifier.height(9.dp))
-                DummyBar(width = 140.dp)
-                Spacer(Modifier.height(9.dp))
-                DummyBar(width = 165.dp)
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    "開くと実際の表示が見られます",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (previewTree != null) {
+                WidgetPreview(previewTree)
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        "サンプル表示",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(30.dp))
+                    EmojiTile(name = name, seed = seed, size = 64.dp, emojiSize = 32)
+                    Spacer(Modifier.height(16.dp))
+                    DummyBar(width = 190.dp)
+                    Spacer(Modifier.height(9.dp))
+                    DummyBar(width = 140.dp)
+                    Spacer(Modifier.height(9.dp))
+                    DummyBar(width = 165.dp)
+                }
             }
         }
         Column(modifier = Modifier.padding(Tokens.CardPadding)) {
